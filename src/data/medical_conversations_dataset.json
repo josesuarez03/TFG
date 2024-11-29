@@ -1,12 +1,26 @@
 {
   "dataset_version": "1.0",
   "created_at": "2024-11-29T17:39:02.667960",
-  "total_conversations": 1,
+  "total_conversations": 2,
   "conversations": [
     {
       "conversation_id": "b4c5f314-dec0-4589-b1b7-2af4f31e280d",
       "user_id": "ee384af9-e9a8-42e8-a3a6-c35f3e244785",
       "timestamp": "2024-11-29T17:45:53.149516",
+      "medical_context": {
+        "analysis": []
+      },
+      "messages": [
+        {
+          "role": "user",
+          "content": "3"
+        }
+      ]
+    },
+    {
+      "conversation_id": "ce99a43c-52f7-49b3-8112-ea6d337f7d52",
+      "user_id": "53c08b61-fdec-4730-8779-ca869997ce03",
+      "timestamp": "2024-11-29T18:07:20.813680",
       "medical_context": {
         "analysis": []
       },
