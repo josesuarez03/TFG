@@ -1,7 +1,7 @@
 {
   "dataset_version": "1.0",
   "created_at": "2024-11-29T17:39:02.667960",
-  "total_conversations": 2,
+  "total_conversations": 4,
   "conversations": [
     {
       "conversation_id": "b4c5f314-dec0-4589-b1b7-2af4f31e280d",
@@ -28,6 +28,34 @@
         {
           "role": "user",
           "content": "3"
+        }
+      ]
+    },
+    {
+      "conversation_id": "263c98aa-f184-43a4-8746-ae4ffce2ce60",
+      "user_id": "27d47788-44e0-4926-a47e-3963f18cab9d",
+      "timestamp": "2024-11-29T18:11:10.980354",
+      "medical_context": {
+        "analysis": []
+      },
+      "messages": [
+        {
+          "role": "user",
+          "content": "4"
+        }
+      ]
+    },
+    {
+      "conversation_id": "0dcadcec-4589-4293-ae08-19b8a83e51b4",
+      "user_id": "27d47788-44e0-4926-a47e-3963f18cab9d",
+      "timestamp": "2024-11-29T18:11:49.481628",
+      "medical_context": {
+        "analysis": []
+      },
+      "messages": [
+        {
+          "role": "user",
+          "content": "TENGO DOLOR DE CABEZA"
         }
       ]
     }
