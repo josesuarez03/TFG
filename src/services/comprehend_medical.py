@@ -1,17 +1,39 @@
 import boto3
 from config import Config
-from services.bedrock_claude import call_claude
+from bedrock_claude import call_claude
 import logging
+import json
 
-def detect_entities(text):
+def detect_medical_context(messages):
+    """
+    Analyze conversation history to extract medical context
+    """
+    context_prompt = f"""
+    Analiza el siguiente historial de conversación y extrae información médica relevante:
+    
+    Conversación: {json.dumps(messages)}
+    
+    Proporciona un resumen estructurado que incluya:
+    - Información personal (edad, sexo)
+    - Síntomas reportados
+    - Nivel de dolor
+    - Posibles áreas de preocupación médica
+    """
+    
+    try:
+        context_analysis = call_claude(context_prompt, max_tokens=300, temperature=0.1)
+        return context_analysis
+    except Exception as e:
+        logging.error(f"Error analyzing medical context: {e}")
+        return "No se pudo analizar el contexto médico"
 
+def detect_entities(text, context=None):
     try:
         client = boto3.client(service_name='comprehendmedical', region_name=Config.AWS_REGION)
 
         result = client.detect_entities(Text=text)
 
         entities = []
-
         for entity in result.get('Entities', []):
             entity_data = {
                'Text': entity.get('Text', ''),
@@ -30,48 +52,53 @@ def detect_entities(text):
 
             entities.append(entity_data)
 
+        # If additional context is provided, enhance entity detection
+        if context:
+            enhanced_context = detect_medical_context([{"content": text}])
+            return {
+                "entities": entities,
+                "context_analysis": enhanced_context
+            }
+
         return entities
 
     except Exception as e:
         logging.error(f"Error detecting medical entities: {e}")
         return []
 
-def analyze_text(text):
+def analyze_text(text, context=None):
+    return detect_entities(text, context)
 
-    return detect_entities(text)
-
-def generate_responses(text, language='es'):
-
-    prompts = {
-        'es': f"""
-        Eres un asistente médico profesional. Analiza el siguiente texto y 
-        proporciona un diagnóstico presuntivo basado en la información médica:
+def generate_responses(text, context=None):
+    # Determine prompt based on available context
+    if context:
+        medical_context_prompt = f"""
+        Contexto médico actual: {context}
         
-        Texto: "{text}"
+        Nuevo mensaje del paciente: {text}
         
-        Por favor, proporciona:
-        1. Un posible diagnóstico
-        2. Recomendaciones iniciales
-        3. Razones que respaldan tu análisis
-        """,
-        'en': f"""
-        You are a professional medical assistant. Analyze the following text 
-        and provide a presumptive diagnosis:
+        Como asistente médico profesional:
+        1. Considera el contexto previo
+        2. Haz preguntas adicionales si es necesario
+        3. Proporciona orientación médica basada en la información disponible
         
-        Text: "{text}"
-        
-        Please provide:
-        1. A possible diagnosis
-        2. Initial recommendations
-        3. Reasoning behind your analysis
+        Si requieres más información, formula preguntas específicas.
         """
-    }
+    else:
+        medical_context_prompt = f"""
+        Como asistente médico profesional, analiza el siguiente mensaje:
+        
+        Mensaje: {text}
+        
+        Proporciona:
+        1. Posibles áreas de preocupación
+        2. Preguntas para obtener más información
+        3. Orientación inicial
+        """
 
-    prompt = prompts.get(language, prompts['es'])
-    
     try:
-        response = call_claude(prompt)
+        response = call_claude(medical_context_prompt, max_tokens=300, temperature=0.1)
         return response
     except Exception as e:
         logging.error(f"Error generating medical response: {e}")
-        return "No se pudo generar una respuesta médica."
+        return "Necesito más información para poder ayudarte adecuadamente."
