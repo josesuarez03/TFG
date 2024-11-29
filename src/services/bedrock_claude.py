@@ -8,22 +8,28 @@ def call_claude(prompt, max_tokens=500, temperature=0.1):
 
     model_id = "us.anthropic.claude-3-5-haiku-20241022-v1:0"
 
-    body = {
-        "messages": [{"role": "user", "content": prompt}],
+    body = json.dumps({
+        "anthropic_version": "bedrock-2023-05-31",
         "max_tokens": max_tokens,
-        "temperature": temperature
-    }
+        "temperature": temperature,
+        "messages": [
+            {
+                "role": "user",
+                "content": prompt
+            }
+        ]
+    })
 
     try:
         response = client.invoke_model(
             modelId=model_id,
-            body=json.dumps(body),
-            contentType="application/json",
+            body=body,
+            contentType="application/json"
         )
 
         # Process response
         result = json.loads(response['body'].read())
-        return result["content"][0]["text"]
+        return result['content'][0]['text']
     
     except (ClientError, Exception) as e:
         print(f"ERROR: Can't invoke '{model_id}'. Reason: {e}")
