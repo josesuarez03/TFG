@@ -1,6 +1,6 @@
 import boto3
 from config import Config
-from bedrock_claude import call_claude
+from services.bedrock_claude import call_claude
 import logging
 import json
 
