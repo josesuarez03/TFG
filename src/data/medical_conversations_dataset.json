@@ -1,7 +1,7 @@
 {
   "dataset_version": "1.0",
   "created_at": "2024-11-29T17:39:02.667960",
-  "total_conversations": 12,
+  "total_conversations": 14,
   "conversations": [
     {
       "conversation_id": "b4c5f314-dec0-4589-b1b7-2af4f31e280d",
@@ -214,6 +214,47 @@
         {
           "role": "user",
           "content": "gracias"
+        }
+      ]
+    },
+    {
+      "conversation_id": "93f842ac-46ad-4ed0-b658-6435f4f5061d",
+      "user_id": "0f3e2f2b-0bbc-45aa-a287-8bf9c7f506c1",
+      "timestamp": "2024-12-10T12:06:03.049066",
+      "medical_context": {
+        "analysis": []
+      },
+      "messages": [
+        {
+          "role": "user",
+          "content": "5"
+        }
+      ]
+    },
+    {
+      "conversation_id": "0bd6fd37-376c-4a2c-a05e-834912fbc388",
+      "user_id": "0f3e2f2b-0bbc-45aa-a287-8bf9c7f506c1",
+      "timestamp": "2024-12-10T12:06:44.840608",
+      "medical_context": {
+        "analysis": [
+          {
+            "Text": "dolor de cabeza",
+            "Category": "MEDICAL_CONDITION",
+            "Type": "DX_NAME",
+            "Score": 0.7950295805931091
+          },
+          {
+            "Text": "cabeza",
+            "Category": "ANATOMY",
+            "Type": "SYSTEM_ORGAN_SITE",
+            "Score": 0.5971075296401978
+          }
+        ]
+      },
+      "messages": [
+        {
+          "role": "user",
+          "content": "tengo dolor de cabeza intenso"
         }
       ]
     }
