@@ -1,0 +1,34 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:latest
+    container_name: postgres_db
+    environment:
+      POSTGRES_USER: myuser
+      POSTGRES_PASSWORD: mypassword
+      POSTGRES_DB: mydatabase
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./custom_postgresql.conf:/etc/postgresql/postgresql.conf
+      # - ./init.db:/docker-entrypoint-initdb.d/init.db
+    command: postgres -c 'config_file=/etc/postgresql/postgresql.conf'
+    restart: on-failure
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U myuser -d mydatabase -h localhost"]
+      interval: 10s
+      retries: 5
+      start_period: 30s
+      timeout: 5s
+    networks:
+      - app
+
+volumes:
+  postgres_data:
+    driver: local
+
+networks:
+  app:
+    driver: bridge
