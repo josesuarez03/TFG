@@ -1,6 +1,6 @@
 import logging
 from typing import List, Dict
-from input_restriction import analyze_message
+from services.input_validate import analyze_message
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
