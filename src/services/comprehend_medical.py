@@ -68,37 +68,3 @@ def detect_entities(text, context=None):
 
 def analyze_text(text, context=None):
     return detect_entities(text, context)
-
-def generate_responses(text, context=None):
-    # Determine prompt based on available context
-    if context:
-        medical_context_prompt = f"""
-        Contexto médico actual: {context}
-        
-        Nuevo mensaje del paciente: {text}
-        
-        Como asistente médico profesional:
-        1. Considera el contexto previo
-        2. Haz preguntas adicionales si es necesario
-        3. Proporciona orientación médica basada en la información disponible
-        
-        Si requieres más información, formula preguntas específicas.
-        """
-    else:
-        medical_context_prompt = f"""
-        Como asistente médico profesional, analiza el siguiente mensaje:
-        
-        Mensaje: {text}
-        
-        Proporciona:
-        1. Posibles áreas de preocupación
-        2. Preguntas para obtener más información
-        3. Orientación inicial
-        """
-
-    try:
-        response = call_claude(medical_context_prompt, max_tokens=300, temperature=0.1)
-        return response
-    except Exception as e:
-        logging.error(f"Error generating medical response: {e}")
-        return "Necesito más información para poder ayudarte adecuadamente."
