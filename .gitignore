@@ -464,3 +464,5 @@ TSWLatexianTemp*
 
 # xwatermark package
 *.xwm
+
+.vscode
