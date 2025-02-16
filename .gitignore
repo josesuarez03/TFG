@@ -466,3 +466,5 @@ TSWLatexianTemp*
 *.xwm
 
 .vscode
+
+*.mpp
