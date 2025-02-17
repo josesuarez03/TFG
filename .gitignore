@@ -468,3 +468,6 @@ TSWLatexianTemp*
 .vscode
 
 *.mpp
+
+.tmp.driveupload
+.tmp.drivedownload
