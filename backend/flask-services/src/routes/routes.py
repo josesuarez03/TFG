@@ -1,8 +1,9 @@
 from flask import Blueprint, jsonify, request
 from config import Config
-from services.comprehend_medical import generate_responses, detect_entities, analyze_text
+from services.comprehend_medical import detect_entities
 from datetime import datetime, timedelta
 from models.conversation import ConversationalDatasetManager
+from services.chatbot import Chatbot
 
 bp = Blueprint('chat', __name__, url_prefix='/chat')
 conversational_dataset_manager = ConversationalDatasetManager()
@@ -13,50 +14,42 @@ def save_conversation(user_id, medical_context, messages):
 @bp.route('/message', methods=['POST'])
 def process_message():
     data = request.get_json()
-    user_message = data['message']
+    user_message = data.get('message', '')
     user_id = data.get('user_id', 'anonymous')
-    context = data.get('context', {})
-    
-    if not context.get('initialized'):
-        if not context.get('name'):
-            return jsonify({
-                "response": "¡Hola! Para comenzar, ¿cómo te llamas?",
-                "next_step": "ask_name"
-            })
-        
-        if not context.get('age'):
-            return jsonify({
-                "response": f"Encantado de conocerte, {context['name']}. ¿Cuántos años tienes?",
-                "next_step": "ask_age"
-            })
-        
-        if not context.get('symptoms'):
-            return jsonify({
-                "response": f"Gracias, {context['name']}. En un rango del 1 al 10, ¿cómo te sientes hoy?",
-                "next_step": "ask_symptoms"
-            })
+    user_data = data.get('context', {})
 
-    analysis_result = analyze_text(user_message)
+    if not user_message.strip():
+        return jsonify({"error": "El mensaje no puede estar vacío."}), 400
+
+    # Crear instancia del chatbot con la entrada del usuario y su contexto
+    chatbot = Chatbot(user_message, user_data)
+    response_data = chatbot.initialize_conversation()
+
+    if "error" in response_data:
+        return jsonify(response_data), 400
 
     messages = [
         {"role": "user", "content": user_message},
-        # You might want to add the AI's response here as well
+        {"role": "assistant", "content": response_data["response"]}
     ]
 
-    save_conversation(user_id, {"analysis": analysis_result}, messages)
-
-    ai_response = generate_responses(user_message)
+    save_conversation(user_id, {"analysis": response_data["entities"]}, messages)
 
     return jsonify({
         "user_message": user_message,
-        "ai_response": ai_response,
-        "analysis": analysis_result
+        "ai_response": response_data["response"],
+        "analysis": response_data["entities"],
+        "context": response_data["context"],
+        "triaje_level": response_data["triaje_level"]
     })
 
 @bp.route('/medical', methods=['POST'])
 def analyze_medical():
     data = request.get_json()
-    text = data['text']
+    text = data.get('text', '')
+
+    if not text.strip():
+        return jsonify({"error": "El texto para analizar no puede estar vacío."}), 400
 
     medical_entities = detect_entities(text)
 
