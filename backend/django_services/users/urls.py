@@ -1,10 +1,9 @@
-# urls.py
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 from rest_framework_simplejwt.views import TokenRefreshView
 
 from .views import (
-    UserRegistrationView, OAuthLoginView, CompleteProfileView,
+    RegisterUserView, OAuthLoginView, CompleteProfileView,
     UserProfileView, UserViewSet
 )
 
@@ -13,7 +12,7 @@ router.register(r'admin/users', UserViewSet)
 
 urlpatterns = [
     # Autenticación básica
-    path('register/', UserRegistrationView.as_view(), name='register'),
+    path('register/', RegisterUserView.as_view(), name='register'),
     path('token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
     
     # OAuth
