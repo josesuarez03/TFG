@@ -2,6 +2,7 @@ import uuid
 from django.db import models
 from django.contrib.auth.models import AbstractUser
 from django.utils.translation import gettext_lazy as _
+from ..common.security.utils import sanitize_input
 
 class User(AbstractUser):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
@@ -65,6 +66,15 @@ class User(AbstractUser):
         self.save(update_fields=['is_profile_completed'])
         return self.is_profile_completed
     
+    def save(self, *args, **kwargs):
+        # Sanitizar los campos sensibles antes de guardar
+        self.first_name = sanitize_input(self.first_name)
+        self.last_name = sanitize_input(self.last_name)
+        self.telefono = sanitize_input(self.telefono)
+        self.direccion = sanitize_input(self.direccion)
+        self.oauth_provider = sanitize_input(self.oauth_provider)
+        self.oauth_uid = sanitize_input(self.oauth_uid)
+        super().save(*args, **kwargs)
 
     
 class Patient(models.Model):
@@ -91,6 +101,14 @@ class Patient(models.Model):
         if self.usuario.tipo != 'paciente':
             self.usuario.tipo = 'paciente'
             self.usuario.save(update_fields=['tipo'])
+
+        self.triaje_level = sanitize_input(self.triaje_level)
+        self.ocupacion = sanitize_input(self.ocupacion)
+        self.medical_context = sanitize_input(self.medical_context)
+        self.allergies = sanitize_input(self.allergies)
+        self.medications = sanitize_input(self.medications)
+        self.medical_history = sanitize_input(self.medical_history)
+
         super().save(*args, **kwargs)
 
     def update_from_chatbot_analysis(self, analysis_data):
@@ -141,4 +159,7 @@ class Doctor(models.Model):
         if self.usuario.tipo != 'doctor':
             self.usuario.tipo = 'doctor'
             self.usuario.save(update_fields=['tipo'])
+
+        self.especialidad = sanitize_input(self.especialidad)
+        self.numero_licencia = sanitize_input(self.numero_licencia)
         super().save(*args, **kwargs)
