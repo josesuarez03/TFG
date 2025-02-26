@@ -14,16 +14,16 @@ from social_django.utils import load_strategy, load_backend
 from social_core.exceptions import MissingBackend, AuthTokenError, AuthForbidden
 
 from .serializers import (
-    UserRegistrationSerializer, UserProfileSerializer, UserBasicInfoSerializer,
-    OAuthUserInfoSerializer, RequiredProfileSerializer
+    UserSerializer, UserProfileSerializer, UserProfileSerializerBasic,
+    OAuthUserInfoSerializer, RequiredOAuthUserSerializer, PatientSerializer, DoctorSerializer
 )
+from .models import Patient, Doctor
 
 User = get_user_model()
 
 class RegisterUserView(generics.CreateAPIView):
-
     queryset = User.objects.all()
-    serializer_class = UserRegistrationSerializer
+    serializer_class = UserSerializer
     permission_classes = [AllowAny]
 
     def post(self, request, *args, **kwargs):
@@ -33,7 +33,7 @@ class RegisterUserView(generics.CreateAPIView):
             refresh = RefreshToken.for_user(user)
             
             return Response({
-                'user': UserBasicInfoSerializer(user).data,
+                'user': UserProfileSerializerBasic(user).data,
                 'refresh': str(refresh),
                 'access': str(refresh.access_token),
                 'profile_complete': False,
@@ -77,7 +77,7 @@ class OAuthLoginView(APIView):
             
             # Si es un usuario nuevo, marcar que debe completar su perfil
             response_data = {
-                'user': UserBasicInfoSerializer(user).data,
+                'user': UserProfileSerializerBasic(user).data,
                 'refresh': str(refresh),
                 'access': str(refresh.access_token),
                 'is_new_user': is_new_user,
@@ -94,7 +94,7 @@ class OAuthLoginView(APIView):
 
 class CompleteProfileView(generics.UpdateAPIView):
     """Vista para completar información adicional después del registro/login con OAuth"""
-    serializer_class = RequiredProfileSerializer
+    serializer_class = RequiredOAuthUserSerializer
     permission_classes = [IsAuthenticated]
     
     def get_object(self):
@@ -105,13 +105,36 @@ class CompleteProfileView(generics.UpdateAPIView):
         serializer = self.get_serializer(user, data=request.data, partial=True)
         
         if serializer.is_valid():
-            serializer.save()
+            # Actualizar campos básicos del usuario
+            for field in ['tipo', 'fecha_nacimiento', 'telefono', 'direccion', 'genero']:
+                if field in serializer.validated_data:
+                    setattr(user, field, serializer.validated_data[field])
             
             # Actualizar first_name y last_name si se proporcionan
             if 'first_name' in request.data:
                 user.first_name = request.data['first_name']
             if 'last_name' in request.data:
                 user.last_name = request.data['last_name']
+            
+            user.save()
+            
+            # Actualizar o crear el perfil de paciente si es necesario
+            if user.tipo == 'patient':
+                patient, created = Patient.objects.get_or_create(user=user)
+                # Actualizar campos del paciente
+                for field in ['allergies', 'ocupacion']:
+                    if field in serializer.validated_data:
+                        setattr(patient, field, serializer.validated_data[field])
+                patient.save()
+            
+            # Actualizar o crear el perfil de doctor si es necesario
+            if user.tipo == 'doctor':
+                doctor, created = Doctor.objects.get_or_create(user=user)
+                # Actualizar campos del doctor
+                for field in ['especialidad', 'numero_licencia']:
+                    if field in serializer.validated_data:
+                        setattr(doctor, field, serializer.validated_data[field])
+                doctor.save()
                 
             # Verificar si el perfil está completo
             user.check_profile_completion()
@@ -140,7 +163,7 @@ class UserViewSet(viewsets.ModelViewSet):
     
     def get_serializer_class(self):
         if self.action == 'list':
-            return UserBasicInfoSerializer
+            return UserProfileSerializerBasic
         return UserProfileSerializer
     
     @action(detail=False, methods=['get'], permission_classes=[IsAuthenticated])
@@ -156,8 +179,8 @@ class UserViewSet(viewsets.ModelViewSet):
         page = self.paginate_queryset(users)
         
         if page is not None:
-            serializer = UserBasicInfoSerializer(page, many=True)
+            serializer = UserProfileSerializerBasic(page, many=True)
             return self.get_paginated_response(serializer.data)
             
-        serializer = UserBasicInfoSerializer(users, many=True)
+        serializer = UserProfileSerializerBasic(users, many=True)
         return Response(serializer.data)
