@@ -28,7 +28,7 @@ class User(AbstractUser):
     last_updated = models.DateTimeField(auto_now=True)
 
     USERNAME_FIELD = 'email'
-    REQUIRED_FIELDS = []  # Removido 'username' ya que el campo username es None
+    REQUIRED_FIELDS = ['username']
 
     class Meta:
         verbose_name = _('usuario')
@@ -41,16 +41,16 @@ class User(AbstractUser):
         """Verifica si el perfil del usuario está completo según su tipo"""
         base_fields = [self.first_name, self.last_name, self.fecha_nacimiento, self.telefono, self.direccion]
         
-        if self.tipo == 'patient':
-            # Para pacientes, necesitamos información básica y médica
-            if all(base_fields) and self.allergies and self.ocupacion:
+        if self.tipo == 'patient' and getattr(self, 'patient', None):
+            if all(base_fields):
                 self.is_profile_completed = True
+                if self.patient.allergies and self.patient.ocupacion:
+                    self.is_profile_completed = True
             else:
                 self.is_profile_completed = False
                 
-        elif self.tipo == 'doctor':
-            # Para médicos, necesitamos información profesional
-            if all(base_fields) and self.especialidad and self.numero_licencia:
+        elif self.tipo == 'doctor' and getattr(self, 'doctor', None):
+            if all(base_fields) and self.doctor.especialidad and self.doctor.numero_licencia:
                 self.is_profile_completed = True
             else:
                 self.is_profile_completed = False
