@@ -13,12 +13,14 @@ class Config:
     AWS_SECRET_KEY = os.getenv("AWS_SECRET_KEY")
     AWS_REGION = os.getenv("AWS_REGION")
 
-    '''# Credenciales para la base de datos de postgres
-    DB_HOST = os.getenv('DB_HOST', 'localhost')
-    DB_USER = os.getenv('DB_USER')
-    DB_PASSWORD = os.getenv('DB_PASSWORD')
-    DB_NAME = os.getenv('DB_NAME')
-    DB_PORT = int(os.getenv('DB_PORT', 3306))'''
+    MONGO_HOST = os.getenv("MONGO_HOST")
+    MONGO_PORT = int(os.getenv("MONGO_PORT"))
+    MONGO_DB = os.getenv("MONGO_INITDB_DATABASE")
+    MONGO_USER = os.getenv("MONGO_INITDB_ROOT_USERNAME")
+    MONGO_PASS = os.getenv("MONGO_INITDB_ROOT_PASSWORD")
+
+    REDIS_HOST = os.getenv("REDIS_HOST")
+    REDIS_PORT = int(os.getenv("REDIS_PORT"))
 
     # Configuraciones de logging
     LOG_LEVEL = os.getenv('LOG_LEVEL', 'INFO')
