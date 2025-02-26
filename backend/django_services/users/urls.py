@@ -3,7 +3,7 @@ from rest_framework.routers import DefaultRouter
 from rest_framework_simplejwt.views import TokenRefreshView
 
 from .views import (
-    RegisterUserView, OAuthLoginView, CompleteProfileView,
+    RegisterUserView, GoogleOAuthLoginView, CompleteProfileView,
     UserProfileView, UserViewSet
 )
 
@@ -15,8 +15,8 @@ urlpatterns = [
     path('register/', RegisterUserView.as_view(), name='register'),
     path('token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
     
-    # OAuth
-    path('oauth/login/', OAuthLoginView.as_view(), name='oauth_login'),
+    # Google OAuth
+    path('google/login/', GoogleOAuthLoginView.as_view(), name='google_oauth_login'),
     
     # Perfil de usuario
     path('profile/complete/', CompleteProfileView.as_view(), name='complete_profile'),

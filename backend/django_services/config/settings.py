@@ -80,6 +80,7 @@ OAUTH2_PROVIDER = {
     },
 }
 
+# Configuración específica para Google OAuth
 AUTHENTICATION_BACKENDS = (
     'social_core.backends.google.GoogleOAuth2',
     'django.contrib.auth.backends.ModelBackend',
@@ -87,6 +88,11 @@ AUTHENTICATION_BACKENDS = (
 
 SOCIAL_AUTH_GOOGLE_OAUTH2_KEY = os.getenv('GOOGLE_CLIENT_ID')
 SOCIAL_AUTH_GOOGLE_OAUTH2_SECRET = os.getenv('GOOGLE_CLIENT_SECRET')
+SOCIAL_AUTH_GOOGLE_OAUTH2_SCOPE = ['email', 'profile']
+SOCIAL_AUTH_GOOGLE_OAUTH2_AUTH_EXTRA_ARGUMENTS = {
+    'access_type': 'offline',
+    'prompt': 'select_account'
+}
 
 REST_USE_JWT = True
 ACCOUNT_AUTHENTICATION_METHOD = "email"
@@ -94,7 +100,7 @@ ACCOUNT_EMAIL_REQUIRED = True
 ACCOUNT_USERNAME_REQUIRED = False
 ACCOUNT_EMAIL_VERIFICATION = "optional"
 
-AUTH_USER_MODEL = 'users.CustomUser'  
+AUTH_USER_MODEL = 'users.User'
 SESSION_COOKIE_AGE = 3600  # 1 hora de sesión
 SESSION_ENGINE = 'django.contrib.sessions.backends.db'
 

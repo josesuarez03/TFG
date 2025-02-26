@@ -103,11 +103,9 @@ class UserProfileSerializerBasic(serializers.ModelSerializer):
         instance.check_profile_completion()
         return instance
 
-class OAuthUserInfoSerializer(serializers.Serializer):
-    """Serializador para recibir información del proveedor OAuth"""
-    provider = serializers.CharField(required=True)
+class GoogleOAuthUserInfoSerializer(serializers.Serializer):
+    """Serializador para recibir información de Google OAuth"""
     token = serializers.CharField(required=True)
-    profile_data = serializers.JSONField(required=False)
 
 class RequiredOAuthUserSerializer(serializers.Serializer):
     tipo = serializers.ChoiceField(choices=User.TIPO_USER, required=True)

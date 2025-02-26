@@ -15,7 +15,7 @@ from social_core.exceptions import MissingBackend, AuthTokenError, AuthForbidden
 
 from .serializers import (
     UserSerializer, UserProfileSerializer, UserProfileSerializerBasic,
-    OAuthUserInfoSerializer, RequiredOAuthUserSerializer, PatientSerializer, DoctorSerializer
+    GoogleOAuthUserInfoSerializer, RequiredOAuthUserSerializer, PatientSerializer, DoctorSerializer
 )
 from .models import Patient, Doctor
 
@@ -41,10 +41,10 @@ class RegisterUserView(generics.CreateAPIView):
             }, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
     
-class OAuthLoginView(APIView):
-    """Vista para autenticación con proveedores OAuth"""
+class GoogleOAuthLoginView(APIView):
+    """Vista para autenticación con Google"""
     permission_classes = [AllowAny]
-    serializer_class = OAuthUserInfoSerializer
+    serializer_class = GoogleOAuthUserInfoSerializer
 
     @transaction.atomic
     def post(self, request):
@@ -52,11 +52,13 @@ class OAuthLoginView(APIView):
         if not serializer.is_valid():
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
             
-        provider = serializer.validated_data['provider']
         token = serializer.validated_data['token']
         
         try:
-            # Cargar la estrategia y backend para el proveedor OAuth
+            # Proveedor Google OAuth2
+            provider = 'google-oauth2'
+            
+            # Cargar la estrategia y backend para Google
             strategy = load_strategy(request)
             backend = load_backend(strategy, provider, redirect_uri=None)
             
@@ -65,9 +67,15 @@ class OAuthLoginView(APIView):
             
             if not user:
                 return Response(
-                    {"error": "Error de autenticación con el proveedor."},
+                    {"error": "Error de autenticación con Google."},
                     status=status.HTTP_400_BAD_REQUEST
                 )
+            
+            # Guardar información del proveedor OAuth
+            user.oauth_provider = 'google'
+            if not user.oauth_uid and hasattr(user, 'social_user'):
+                user.oauth_uid = user.social_user.uid
+            user.save(update_fields=['oauth_provider', 'oauth_uid'])
                 
             # Verificar si es un usuario nuevo o existente
             is_new_user = user.date_joined == user.last_login
@@ -88,7 +96,7 @@ class OAuthLoginView(APIView):
             
         except (MissingBackend, AuthTokenError, AuthForbidden) as e:
             return Response(
-                {"error": f"Error en autenticación OAuth: {str(e)}"},
+                {"error": f"Error en autenticación con Google: {str(e)}"},
                 status=status.HTTP_400_BAD_REQUEST
             )
 
