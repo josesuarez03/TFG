@@ -37,7 +37,19 @@ MIDDLEWARE = [
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
+    'django_services.common.middleware.flask_integration.FlaskDjangoIntegration',  # Middleware para la integración con Flask
+    'django.contrib.messages.middleware.MessageMiddleware',
+    'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
+
+FLASK_INTEGRATION = {
+    'ENABLED': True,
+    'FLASK_ROUTES': [
+        '/chat/',  # Rutas que serán manejadas por Flask
+    ],
+    'FLASK_APP_PATH': os.path.join(BASE_DIR, '..', 'flask-services', 'src'),
+}
+
 
 CORS_ALLOW_ALL_ORIGINS = True  # Puedes restringirlo en producción
 
