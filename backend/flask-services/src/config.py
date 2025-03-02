@@ -22,6 +22,9 @@ class Config:
     REDIS_HOST = os.getenv("REDIS_HOST")
     REDIS_PORT = int(os.getenv("REDIS_PORT"))
 
+    JWT_SECRET = os.getenv("DJANGO_SECRET_KEY")
+    JWT_ALGORITHM = os.getenv("JWT_ALGORITHM")
+
     # Configuraciones de logging
     LOG_LEVEL = os.getenv('LOG_LEVEL', 'INFO')
     LOG_FILE = os.getenv('LOG_FILE', 'app.log')
