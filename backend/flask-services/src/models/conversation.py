@@ -2,7 +2,7 @@ import json
 import logging
 from datetime import datetime
 import uuid
-from connect import MONGO_URI, mongo_db, mongo_client, redis_client
+from data.connect import  mongo_db, redis_client
 
 # Configurar logger
 logger = logging.getLogger(__name__)

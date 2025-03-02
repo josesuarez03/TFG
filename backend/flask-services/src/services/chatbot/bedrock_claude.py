@@ -1,6 +1,6 @@
 import boto3
 from botocore.exceptions import ClientError
-from config import Config
+from config.config import Config
 import json
 
 def call_claude(prompt, max_tokens=500, temperature=0.1):

@@ -1,9 +1,9 @@
 import logging
-from context_manager import init_context
-from comprehend_medical import detect_entities
-from input_validate import analyze_message
-from triaje_classification import TriageClassification
-from bedrock_claude import call_claude
+from services.chatbot.context_manager import init_context
+from services.chatbot.comprehend_medical import detect_entities
+from services.chatbot.input_validate import analyze_message
+from services.chatbot.triaje_classification import TriageClassification
+from services.chatbot.bedrock_claude import call_claude
 
 logging.basicConfig(level=logging.INFO)
 

@@ -1,5 +1,5 @@
 from flask import session
-from services.comprehend_medical import detect_entities
+from services.chatbot.comprehend_medical import detect_entities
 
 def init_context(text):
 

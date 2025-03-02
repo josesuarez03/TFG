@@ -1,5 +1,5 @@
 import logging
-from services.chatbot import Chatbot
+from services.chatbot.chatbot import Chatbot
 from models.conversation import ConversationalDatasetManager
 from ....django_services.common.security.encryption import Encryption
 
