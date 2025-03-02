@@ -7,12 +7,15 @@ from services.chatbot import Chatbot
 import jwt
 import logging
 from ....django_services.common.security.encryption import Encryption
+from flask_socketio import SocketIO, emit, join_room, leave_room
 
 # Configurar logger
 logger = logging.getLogger(__name__)
 
 bp = Blueprint('chat', __name__, url_prefix='/chat')
 conversational_dataset_manager = ConversationalDatasetManager()
+
+socketio = SocketIO(cors_allowed_origins="*")
 
 INITIAL_PROMPT = """Eres un asistente medico virtual. Tu tarea es realizar un triaje inicial a los pacientes para ayudarlos a identificar sus sintomas,
                 tienes que proporcionar información general sobre las codiciones medicas proporcionadas por el usuario y ofrecer una orientación inicial para buscar
@@ -24,36 +27,7 @@ INITIAL_PROMPT = """Eres un asistente medico virtual. Tu tarea es realizar un tr
                 Si el usuario proporciona información correcta, debes confirmarla.
                 """
 
-def get_user_id_token(request):
-    auth_header = request.headers.get("Authorization")
 
-    if not auth_header:
-        return None
-    
-    parts = auth_header.split()
-    if parts[0].lower() != 'bearer' or len(parts) != 2:
-        return None
-    
-    token = parts[1]
-
-    try:
-
-        secret_key = Config.JWT_SECRET
-        algorithm = Config.JWT_ALGORITHM
-
-        payload = jwt.decode(token, secret_key, algorithms=[algorithm])
-        user_id = payload.get('user_id') or payload.get('sub')
-
-        return user_id
-    except jwt.ExpiredSignatureError:
-        logger.warning("Token expirado")
-        return None
-    except jwt.InvalidTokenError as e:
-        logger.warning(f"Token inválido: {str(e)}")
-        return None
-    except Exception as e:
-        logger.error(f"Error al procesar token: {str(e)}")
-        return None
 
 @bp.route('/message', methods=['POST'])
 def process_message():
