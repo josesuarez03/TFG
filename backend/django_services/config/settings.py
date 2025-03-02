@@ -48,6 +48,7 @@ FLASK_INTEGRATION = {
         '/chat/',  # Rutas que serán manejadas por Flask
     ],
     'FLASK_APP_PATH': os.path.join(BASE_DIR, '..', 'flask-services', 'src'),
+    'FLASK_BASE_URL': os.getenv('FLASK_BASE_URL'),
 }
 
 
