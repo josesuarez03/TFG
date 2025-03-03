@@ -63,6 +63,24 @@ services:
     networks:
       - app
 
+  fail2ban:
+    image: lscr.io/linuxserver/fail2ban:latest
+    container_name: fail2ban
+    cap_add:
+      - NET_ADMIN
+      - NET_RAW
+    network_mode: host
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=Etc/UTC
+    volumes:
+      - /path/to/fail2ban/config:/config
+      - /var/log:/var/log:ro
+    restart: unless-stopped
+    networks:
+      - app
+
 volumes:
   postgres_data:
     driver: local
@@ -70,7 +88,7 @@ volumes:
     driver: local
   redis_data:
     driver: local
-
+    
 networks:
   app:
     driver: bridge
