@@ -51,7 +51,4 @@ if __name__ == '__main__':
         port=5000, 
         debug=Config.DEBUG,
         use_reloader=Config.DEBUG,
-        ping_timeout=60,  # Aumentar timeout para conexiones lentas
-        ping_interval=25,  # Intervalo de ping para mantener conexiones activas
-        cors_allowed_origins="*"  # Permitir WebSockets desde cualquier origen
     )
