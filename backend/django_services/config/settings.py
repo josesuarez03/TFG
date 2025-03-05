@@ -18,6 +18,7 @@ INSTALLED_APPS = [
 
     # DRF y autenticación
     'rest_framework',
+    'rest_framework.authtoken',
     'rest_framework_simplejwt',
     'dj_rest_auth',
     'oauth2_provider',  
