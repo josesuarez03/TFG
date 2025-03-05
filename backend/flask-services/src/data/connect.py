@@ -1,4 +1,4 @@
-from config import Config
+from config.config import Config
 import pymongo
 import redis
 

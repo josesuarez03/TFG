@@ -1,9 +1,9 @@
 from flask import jsonify, request
 import logging
 from . import bp
-from .utils import process_message_logic, conversational_dataset_manager
+from routes.utils import process_message_logic, conversational_dataset_manager
 from services.auth.auth import get_user_id_token
-from ....django_services.common.security.encryption import Encryption
+from django_services.common.security.encryption import Encryption
 
 # Configurar logger
 logger = logging.getLogger(__name__)

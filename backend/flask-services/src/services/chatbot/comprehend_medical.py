@@ -1,5 +1,5 @@
 import boto3
-from config import Config
+from config.config import Config
 from services.chatbot.bedrock_claude import call_claude
 import logging
 import json

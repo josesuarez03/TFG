@@ -3,11 +3,12 @@ import os
 import sys
 import logging
 
+# Configurar logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
 # Cargar variables de entorno
 load_dotenv()
-
-# Configurar logging
-logger = logging.getLogger(__name__)
 
 # Integración con Django
 DJANGO_INTEGRATION = False
@@ -15,20 +16,26 @@ DJANGO_SETTINGS = None
 DJANGO_MODELS_AVAILABLE = False
 
 try:
-    # Determinar la ruta al proyecto Django
+    # Determinar la ruta al proyecto Django si aún no está en el sys.path
     current_dir = os.path.dirname(os.path.abspath(__file__))
-    django_project_path = os.path.abspath(os.path.join(current_dir, '../..', 'django_services'))
+    project_root = os.path.abspath(os.path.join(current_dir, '../..', '..'))
+    django_project_path = os.path.join(project_root, 'django_services')
     
     if django_project_path not in sys.path:
-        sys.path.append(django_project_path)
+        sys.path.insert(0, django_project_path)
+        sys.path.insert(0, project_root)
+        logger.info(f"Añadidos a sys.path: {project_root}, {django_project_path}")
     
     # Configurar el entorno Django
-    os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'config.settings')
+    os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'django_services.config.settings')
     
     # Importar configuración de Django
     from django.conf import settings
     import django
-    django.setup()  # Inicializar Django para poder usar sus modelos
+    
+    # Inicializar Django si no está ya configurado
+    if not django.conf.settings.configured:
+        django.setup()  # Inicializar Django para poder usar sus modelos
     
     # Usar la misma clave secreta y algoritmo JWT que Django
     DJANGO_INTEGRATION = True
@@ -62,16 +69,17 @@ class Config:
     AWS_REGION = os.getenv("AWS_REGION")
 
     MONGO_HOST = os.getenv("MONGO_HOST")
-    MONGO_PORT = int(os.getenv("MONGO_PORT"))
+    MONGO_PORT = int(os.getenv("MONGO_PORT", "27017"))
     MONGO_DB = os.getenv("MONGO_INITDB_DATABASE")
     MONGO_USER = os.getenv("MONGO_INITDB_ROOT_USERNAME")
     MONGO_PASS = os.getenv("MONGO_INITDB_ROOT_PASSWORD")
 
     REDIS_HOST = os.getenv("REDIS_HOST")
-    REDIS_PORT = int(os.getenv("REDIS_PORT"))
+    REDIS_PORT = int(os.getenv("REDIS_PORT", "6379"))
 
-    JWT_SECRET = os.getenv("DJANGO_SECRET_KEY")
-    JWT_ALGORITHM = os.getenv("JWT_ALGORITHM")
+    # Usar la clave secreta de Django si está disponible
+    JWT_SECRET = DJANGO_SECRET_KEY or os.getenv("JWT_SECRET", "default_jwt_secret")
+    JWT_ALGORITHM = JWT_ALGORITHM or os.getenv("JWT_ALGORITHM", "HS256")
 
     # Integración con Django
     DJANGO_INTEGRATION = DJANGO_INTEGRATION

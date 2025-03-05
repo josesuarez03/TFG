@@ -3,8 +3,8 @@ import uuid
 from flask import request
 from flask_socketio import emit, join_room, leave_room
 from . import socketio
-from .utils import process_message_logic, conversational_dataset_manager
-from ....django_services.common.security.encryption import Encryption
+from routes.utils import process_message_logic, conversational_dataset_manager
+from django_services.common.security.encryption import Encryption
 from services.auth.auth import get_user_id_token
 
 # Configurar logger

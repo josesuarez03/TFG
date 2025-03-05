@@ -1,6 +1,6 @@
 import jwt
 import logging
-from config import Config
+from config.config import Config
 
 # Configurar logger
 logger = logging.getLogger(__name__)
