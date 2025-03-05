@@ -12,11 +12,13 @@ DEBUG = os.getenv('DEBUG') == 'True'
 ALLOWED_HOSTS = os.getenv('ALLOWED_HOSTS', '*').split(',')
 
 INSTALLED_APPS = [
-    'django.contrib.contenttypes',
+    'django.contrib.admin', 
     'django.contrib.auth',
+    'django.contrib.contenttypes',
     'django.contrib.sessions',
+    'django.contrib.messages', 
 
-    # DRF y autenticación
+    # DRF and authentication
     'rest_framework',
     'rest_framework.authtoken',
     'rest_framework_simplejwt',
@@ -24,22 +26,38 @@ INSTALLED_APPS = [
     'oauth2_provider',  
     'social_django', 
 
-    # Seguridad y CORS
+    # Security and CORS
     'corsheaders',
 
-    # App de usuarios personalizada
+    # Custom users app
     'users',
+]
+
+TEMPLATES = [
+    {
+        'BACKEND': 'django.template.backends.django.DjangoTemplates',
+        'DIRS': [],
+        'APP_DIRS': True,
+        'OPTIONS': {
+            'context_processors': [
+                'django.template.context_processors.debug',
+                'django.template.context_processors.request',
+                'django.contrib.auth.context_processors.auth',
+                'django.contrib.messages.context_processors.messages',
+            ],
+        },
+    },
 ]
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
-    'corsheaders.middleware.CorsMiddleware',  # Habilita CORS
+    'corsheaders.middleware.CorsMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
-    'django_services.common.middleware.flask_integration.FlaskDjangoIntegration',  # Middleware para la integración con Flask
-    'django.contrib.messages.middleware.MessageMiddleware',
+    'django.contrib.messages.middleware.MessageMiddleware', 
+    'common.middleware.flask_integration.FlaskDjangoIntegration',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
 
@@ -67,8 +85,8 @@ if 'FLASK_INTEGRATION' in locals() and FLASK_INTEGRATION.get('ENABLED'):
 
 CORS_ALLOW_ALL_ORIGINS = True  # Puedes restringirlo en producción
 
-ROOT_URLCONF = 'django_services.urls'
-WSGI_APPLICATION = 'django_services.wsgi.application'
+ROOT_URLCONF = 'config.urls'
+WSGI_APPLICATION = 'config.wsgi.application'
 
 DATABASES = {
     'default': {
