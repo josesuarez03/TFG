@@ -9,8 +9,11 @@ load_dotenv()
 # Configurar logging
 logger = logging.getLogger(__name__)
 
-# Intentar importar configuración de Django
+# Integración con Django
 DJANGO_INTEGRATION = False
+DJANGO_SETTINGS = None
+DJANGO_MODELS_AVAILABLE = False
+
 try:
     # Determinar la ruta al proyecto Django
     current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -24,11 +27,22 @@ try:
     
     # Importar configuración de Django
     from django.conf import settings
+    import django
+    django.setup()  # Inicializar Django para poder usar sus modelos
     
     # Usar la misma clave secreta y algoritmo JWT que Django
     DJANGO_INTEGRATION = True
+    DJANGO_SETTINGS = settings
     DJANGO_SECRET_KEY = settings.SECRET_KEY
     JWT_ALGORITHM = os.getenv("JWT_ALGORITHM") # Usar el mismo algoritmo que en Django
+    
+    # Verificar si podemos acceder a los modelos de Django
+    try:
+        from django.apps import apps
+        DJANGO_MODELS_AVAILABLE = True
+        logger.info("Modelos de Django disponibles para la aplicación Flask")
+    except Exception as e:
+        logger.warning(f"No se pudo acceder a los modelos de Django: {str(e)}")
     
     logger.info("Integración con Django configurada correctamente")
     
@@ -61,7 +75,7 @@ class Config:
 
     # Integración con Django
     DJANGO_INTEGRATION = DJANGO_INTEGRATION
-
+    DJANGO_MODELS_AVAILABLE = DJANGO_MODELS_AVAILABLE
 
     # Configuraciones de logging
     LOG_LEVEL = os.getenv('LOG_LEVEL', 'INFO')
