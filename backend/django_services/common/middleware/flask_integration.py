@@ -111,16 +111,25 @@ class FlaskDjangoIntegration(MiddlewareMixin):
     
     def get_wsgi_environ(self, request):
 
-        # Crear un entorno WSGI básico
-        environ = {
+        # Usar getattr para acceder a la caché o crearla si no existe
+        if not hasattr(self, '_environ_static_cache'):
+            # Valores que no cambian entre peticiones
+            self._environ_static_cache = {
+                'wsgi.version': (1, 0),
+                'wsgi.multithread': True,
+                'wsgi.multiprocess': True,
+                'wsgi.run_once': False,
+                'SERVER_SOFTWARE': 'Django',
+            }
+        
+        # Crear entorno copiando primero la caché para reducir asignaciones
+        environ = self._environ_static_cache.copy()
+        
+        # Añadir los valores dinámicos específicos de la petición
+        environ.update({
             'wsgi.input': request,
             'wsgi.errors': sys.stderr,
-            'wsgi.version': (1, 0),
-            'wsgi.multithread': True,
-            'wsgi.multiprocess': True,
-            'wsgi.run_once': False,
             'wsgi.url_scheme': request.scheme,
-            'SERVER_SOFTWARE': 'Django',
             'REQUEST_METHOD': request.method,
             'PATH_INFO': request.path,
             'QUERY_STRING': request.META.get('QUERY_STRING', ''),
@@ -131,9 +140,9 @@ class FlaskDjangoIntegration(MiddlewareMixin):
             'SERVER_NAME': request.META.get('SERVER_NAME', ''),
             'SERVER_PORT': request.META.get('SERVER_PORT', ''),
             'SERVER_PROTOCOL': request.META.get('SERVER_PROTOCOL', ''),
-        }
+        })
         
-        # Copiar todas las cabeceras HTTP
+        # Copiar solo las cabeceras HTTP necesarias
         for key, value in request.META.items():
             if key.startswith('HTTP_'):
                 environ[key] = value
