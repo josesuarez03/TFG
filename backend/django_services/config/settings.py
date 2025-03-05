@@ -45,12 +45,24 @@ MIDDLEWARE = [
 FLASK_INTEGRATION = {
     'ENABLED': True,
     'FLASK_ROUTES': [
-        '/chat/',  # Rutas que serán manejadas por Flask
+        '/chat/',
+        '/api/ws/',  # Rutas que serán manejadas por Flask
     ],
     'FLASK_APP_PATH': os.path.join(BASE_DIR, '..', 'flask-services', 'src'),
     'FLASK_BASE_URL': os.getenv('FLASK_BASE_URL'),
+    'TIMEOUT': 30,  # Tiempo máximo en segundos para esperar respuesta de Flask
+    'FALLBACK_TO_DJANGO': True,  # Si Flask falla, intentar con Django
+    'SHARED_SESSION': True,  # Compartir sesiones entre Django y Flask
+    'DEBUG_FLASK_REQUESTS': DEBUG,
 }
 
+if 'FLASK_INTEGRATION' in locals() and FLASK_INTEGRATION.get('ENABLED'):
+    CACHES = {
+        'default': {
+            'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
+            'LOCATION': 'flask-django-integration',
+        }
+    }
 
 CORS_ALLOW_ALL_ORIGINS = True  # Puedes restringirlo en producción
 
