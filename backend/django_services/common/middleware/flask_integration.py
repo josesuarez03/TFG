@@ -13,6 +13,8 @@ from django.http import HttpResponse, HttpResponseServerError
 logger = logging.getLogger(__name__)
 
 class FlaskDjangoIntegration(MiddlewareMixin):
+
+    async_mode = None
     
     def __init__(self, get_response):
         self.get_response = get_response
