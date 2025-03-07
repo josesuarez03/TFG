@@ -11,9 +11,9 @@ COPY ../.env ./
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copiar el código fuente del servicio Flask
-COPY ../flask_services ./flask_services
+COPY ../flask-services ./flask-services
 
 EXPOSE 5000
 
-CMD ["python", "flask_services/app.py"]
+CMD ["python", "flask-services/app.py"]
 
