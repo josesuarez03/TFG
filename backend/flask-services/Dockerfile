@@ -1,0 +1,19 @@
+FROM python:3.13.1-slim
+
+# Establecer el directorio de trabajo en el contenedor
+WORKDIR /app
+
+# Copiar los archivos necesarios
+COPY ../requirements.txt ./
+COPY ../.env ./
+
+# Instalar dependencias
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copiar el código fuente del servicio Flask
+COPY ../flask_services ./flask_services
+
+EXPOSE 5000
+
+CMD ["python", "flask_services/app.py"]
+
