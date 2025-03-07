@@ -112,7 +112,10 @@ SIMPLE_JWT = {
     'ROTATE_REFRESH_TOKENS': True,
     'BLACKLIST_AFTER_ROTATION': True,
     'SIGNING_KEY': SECRET_KEY,
+    'ALGORITHM': os.getenv('JWT_ALGORITHM'),
     'AUTH_HEADER_TYPES': ('Bearer',),
+    'USER_ID_FIELD': 'id',
+    'USER_ID_CLAIM': 'user_id',  # Flask busca este claim en el token
 }
 
 OAUTH2_PROVIDER = {
