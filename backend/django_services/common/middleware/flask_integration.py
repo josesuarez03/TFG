@@ -1,3 +1,5 @@
+"""Deprecado: Este middleware no se utiliza actualmente y no ha sido probado en producción"""
+
 import re
 import sys
 import os
