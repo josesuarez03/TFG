@@ -1,6 +1,37 @@
 version: '3.8'
 
 services:
+  django-api-principal:
+    build:
+      context: .
+      dockerfile: backend/django_services/Dockerfile
+    container_name: django-api-principal
+    volumes:
+      - ./backend/django_services:/app  # Mapea el código a /app dentro del contenedor
+    ports:
+      - "8000:8000"
+    depends_on:
+      - postgres
+    restart: on-failure
+    networks:
+      - app
+
+  flask-api-chat:
+    build:
+      context: .
+      dockerfile: backend/flask-services/Dockerfile
+    container_name: flask-api-chat
+    volumes:
+      - ./backend/flask-services:/app  # Mapea el código a /app dentro del contenedor
+    ports:
+      - "5000:5000"
+    depends_on:
+      - mongo
+      - redis
+    restart: on-failure
+    networks:
+      - app
+
   postgres:
     image: postgres:latest
     container_name: postgres
@@ -62,7 +93,7 @@ services:
       timeout: 5s
     networks:
       - app
-  
+
   nginx:
     image: nginx:latest
     container_name: nginx
@@ -73,7 +104,6 @@ services:
     restart: on-failure
     networks:
       - app
-
 
 volumes:
   postgres_data:
