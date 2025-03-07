@@ -4,13 +4,13 @@ FROM python:3.13.1-slim
 WORKDIR /app
 
 # Copiar los archivos necesarios
-COPY ../requirements.txt ./
+COPY requirements.txt .
 
 # Instalar dependencias
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copiar el código fuente del servicio Django
-COPY ../django_services ./django_services
+COPY django_services ./django_services
 
 # Ejecutar migraciones antes de iniciar el servidor
 RUN python django_services/manage.py migrate
