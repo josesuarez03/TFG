@@ -26,6 +26,8 @@ services:
       - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
       - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET}
       - JWT_ALGORITHM=${JWT_ALGORITHM}
+    env_file:
+      - .env
     networks:
       - app
 
