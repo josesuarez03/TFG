@@ -7,7 +7,7 @@ import logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Cargar variables de entorno
+# Cargar variables de entorno (solo se usará si no están ya definidas en el entorno)
 load_dotenv()
 
 # Integración con Django
@@ -16,10 +16,19 @@ DJANGO_SETTINGS = None
 DJANGO_MODELS_AVAILABLE = False
 
 try:
-    # Determinar la ruta al proyecto Django si aún no está en el sys.path
-    current_dir = os.path.dirname(os.path.abspath(__file__))
-    project_root = os.path.abspath(os.path.join(current_dir, '../..', '..'))
-    django_project_path = os.path.join(project_root, 'django_services')
+    # En Docker, la ruta relativa será diferente. Necesitamos adaptar esto.
+    # Determinar si estamos en Docker o desarrollo local
+    IN_DOCKER = os.getenv('IN_DOCKER', 'False') == 'True'
+    
+    if IN_DOCKER:
+        # En Docker, las rutas son más simples porque los volúmenes están montados directamente
+        django_project_path = '/app/django_services'
+        project_root = '/app'
+    else:
+        # En desarrollo local, usamos rutas relativas
+        current_dir = os.path.dirname(os.path.abspath(__file__))
+        project_root = os.path.abspath(os.path.join(current_dir, '../..', '..'))
+        django_project_path = os.path.join(project_root, 'django_services')
     
     if django_project_path not in sys.path:
         sys.path.insert(0, django_project_path)
@@ -60,21 +69,23 @@ except (ImportError, ModuleNotFoundError) as e:
 
 class Config:
     # Configuraciones de la aplicación
-    DEBUG = os.getenv('FLASK_DEBUG', 'True') == 'True'
-    SECRET_KEY = os.getenv("SECRET_KEY", "default_secret_key")
+    DEBUG = os.getenv('DEBUG', 'True') == 'True'
+    SECRET_KEY = os.getenv("DJANGO_SECRET_KEY", "default_secret_key")
 
     # Credenciales para Amazon Web Services
     AWS_ACCESS_KEY = os.getenv("AWS_ACCESS_KEY")
     AWS_SECRET_KEY = os.getenv("AWS_SECRET_KEY")
     AWS_REGION = os.getenv("AWS_REGION")
 
-    MONGO_HOST = os.getenv("MONGO_HOST")
+    # Configuración MongoDB - usar nombres de host de Docker si estamos en contenedores
+    MONGO_HOST = os.getenv("MONGO_HOST", "localhost")
     MONGO_PORT = int(os.getenv("MONGO_PORT", "27017"))
-    MONGO_DB = os.getenv("MONGO_INITDB_DATABASE")
-    MONGO_USER = os.getenv("MONGO_INITDB_ROOT_USERNAME")
-    MONGO_PASS = os.getenv("MONGO_INITDB_ROOT_PASSWORD")
+    MONGO_DB = os.getenv("MONGO_INITDB_DATABASE", "DB")
+    MONGO_USER = os.getenv("MONGO_INITDB_ROOT_USERNAME", "root")
+    MONGO_PASS = os.getenv("MONGO_INITDB_ROOT_PASSWORD", "1234")
 
-    REDIS_HOST = os.getenv("REDIS_HOST")
+    # Configuración Redis - usar nombres de host de Docker si estamos en contenedores
+    REDIS_HOST = os.getenv("REDIS_HOST", "localhost")
     REDIS_PORT = int(os.getenv("REDIS_PORT", "6379"))
 
     # Usar la clave secreta de Django si está disponible
