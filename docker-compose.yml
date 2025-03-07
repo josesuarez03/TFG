@@ -3,17 +3,18 @@ version: '3.8'
 services:
   django-api-principal:
     build:
-      context: .
-      dockerfile: backend/django_services/Dockerfile
+      context: ./backend
+      dockerfile: django_services/Dockerfile
     container_name: django-api-principal
     volumes:
-      - ./backend/django_services:/app  
+      - ./backend/django_services:/app/django_services
     ports:
       - "8000:8000"
     depends_on:
       - postgres
     restart: on-failure
     environment:
+      - IN_DOCKER=True
       - DJANGO_SECRET_KEY=${DJANGO_SECRET_KEY}
       - DEBUG=${DEBUG}
       - ALLOWED_HOSTS=${ALLOWED_HOSTS}
@@ -30,11 +31,11 @@ services:
 
   flask-api-chat:
     build:
-      context: .
-      dockerfile: backend/flask-services/Dockerfile
+      context: ./backend
+      dockerfile: flask-services/Dockerfile
     container_name: flask-api-chat
     volumes:
-      - ./backend/flask-services:/app  
+      - ./backend/flask-services:/app/flask-services
     ports:
       - "5000:5000"
     depends_on:
@@ -42,6 +43,7 @@ services:
       - redis
     restart: on-failure
     environment:
+      - IN_DOCKER=True
       - MONGO_HOST=mongo
       - MONGO_PORT=27017
       - MONGO_INITDB_ROOT_USERNAME=${MONGO_INITDB_ROOT_USERNAME}
@@ -50,8 +52,10 @@ services:
       - REDIS_HOST=redis
       - REDIS_PORT=6379
       - JWT_ALGORITHM=${JWT_ALGORITHM}
+      - DJANGO_SECRET_KEY=${DJANGO_SECRET_KEY}
     networks:
       - app
+
 
   postgres:
     image: postgres:latest
