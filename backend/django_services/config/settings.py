@@ -57,11 +57,11 @@ MIDDLEWARE = [
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware', 
-    'common.middleware.flask_integration.FlaskDjangoIntegration',
+    #'common.middleware.flask_integration.FlaskDjangoIntegration',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
 
-FLASK_INTEGRATION = {
+"""FLASK_INTEGRATION = {
     'ENABLED': True,
     'FLASK_ROUTES': [
         '/chat/',
@@ -81,7 +81,7 @@ if 'FLASK_INTEGRATION' in locals() and FLASK_INTEGRATION.get('ENABLED'):
             'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
             'LOCATION': 'flask-django-integration',
         }
-    }
+    }"""
 
 CORS_ALLOW_ALL_ORIGINS = True  # Puedes restringirlo en producción
 
