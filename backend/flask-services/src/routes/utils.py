@@ -1,7 +1,7 @@
 import logging
 from services.chatbot.chatbot import Chatbot
 from models.conversation import ConversationalDatasetManager
-from django_services.common.security.encryption import Encryption
+from services.security.encryption import Encryption
 
 # Configurar logger
 logger = logging.getLogger(__name__)
