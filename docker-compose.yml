@@ -6,8 +6,6 @@ services:
       context: ./backend
       dockerfile: django_services/Dockerfile
     container_name: django-api-principal
-    volumes:
-      - ./backend/django_services:/app/django_services
     ports:
       - "8000:8000"
     depends_on:
@@ -36,8 +34,6 @@ services:
       context: ./backend
       dockerfile: flask-services/Dockerfile
     container_name: flask-api-chat
-    volumes:
-      - ./backend/flask-services:/app/flask-services
     ports:
       - "5000:5000"
     depends_on:
