@@ -1,11 +1,33 @@
 import { useState, useEffect, useCallback } from "react";
 import API from "@/services/api";
+import {jwtDecode} from "jwt-decode";
+import { useRouter } from "next/router";
 import { LoginResponse, User } from "@/types/auth";
 
 export const useAuth = () => {
+    const router = useRouter();
     const [user, setUser] = useState<User | null>(null);
-    const [loading, setLoading] = useState<boolean>(true); // Inicialmente cargando
+    const [loading, setLoading] = useState<boolean>(true);
     const [error, setError] = useState<string | null>(null);
+
+    // Función para decodificar el token
+    const decodeToken = (token: string): { is_profile_completed?: boolean } | null => {
+        try {
+            return jwtDecode<{ is_profile_completed?: boolean }>(token);
+        } catch (err) {
+            console.error("Error al decodificar el token:", err);
+            return null;
+        }
+    };
+
+    // Función para manejar redirecciones
+    const handleRedirection = (isProfileCompleted?: boolean) => {
+        if (isProfileCompleted) {
+            router.push("/profile/complete");
+        } else {
+            router.push("/dashboard");
+        }
+    };
 
     // Función para iniciar sesión
     const login = async (email: string, password: string): Promise<void> => {
@@ -16,21 +38,38 @@ export const useAuth = () => {
             const response = await API.post<LoginResponse>("token/", { email, password });
             const { access, refresh } = response.data;
 
-            // Guardar tokens en localStorage
             localStorage.setItem("access_token", access);
             localStorage.setItem("refresh_token", refresh);
 
-            // Obtener datos del usuario autenticado
+            const decodedToken = decodeToken(access);
+            handleRedirection(decodedToken?.is_profile_completed);
+
             await fetchUser();
         } catch (err: unknown) {
-            if (err instanceof Error) {
-                setError(err.message);
-            } else if (typeof err === "object" && err !== null && "response" in err) {
-                const axiosError = err as { response: { data: { detail: string } } };
-                setError(axiosError.response?.data?.detail || "Error al iniciar sesión");
-            } else {
-                setError("Error desconocido al iniciar sesión");
-            }
+            setError(err instanceof Error ? err.message : "Error desconocido al iniciar sesión");
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    // Función para iniciar sesión con Google
+    const loginWithGoogle = async (token: string): Promise<void> => {
+        setLoading(true);
+        setError(null);
+
+        try {
+            const response = await API.post<LoginResponse>("auth/google/", { token });
+            const { access, refresh } = response.data;
+
+            localStorage.setItem("access_token", access);
+            localStorage.setItem("refresh_token", refresh);
+
+            const decodedToken = decodeToken(access);
+            handleRedirection(decodedToken?.is_profile_completed);
+
+            await fetchUser();
+        } catch (err: unknown) {
+            setError(err instanceof Error ? err.message : "Error desconocido con Google Login");
         } finally {
             setLoading(false);
         }
@@ -41,8 +80,8 @@ export const useAuth = () => {
         localStorage.removeItem("access_token");
         localStorage.removeItem("refresh_token");
         setUser(null);
-        window.location.href = "/auth/login"; // Redirigir al login
-    }, []);
+        router.push("/auth/login");
+    }, [router]);
 
     // Función para obtener los datos del usuario autenticado
     const fetchUser = useCallback(async (): Promise<void> => {
@@ -51,7 +90,7 @@ export const useAuth = () => {
             setUser(response.data);
         } catch (err: unknown) {
             console.error("Error al obtener el usuario:", err);
-            logout(); // Si falla, cerrar sesión
+            logout();
         }
     }, [logout]);
 
@@ -61,9 +100,9 @@ export const useAuth = () => {
         if (token) {
             fetchUser().catch(() => logout());
         } else {
-            setLoading(false); // Si no hay token, dejar de cargar
+            setLoading(false);
         }
     }, [fetchUser, logout]);
 
-    return { user, login, logout, loading, error };
+    return { user, login, loginWithGoogle, logout, loading, error };
 };

@@ -1,4 +1,9 @@
 import axios from 'axios';
+import Router from 'next/router'; 
+
+export const redirectToLogin = () => {
+    Router.push('/auth/login'); 
+};
 
 const API = axios.create({
     baseURL: 'https://api.medichecks.com/api/',
@@ -10,7 +15,7 @@ const API = axios.create({
 
 API.interceptors.request.use(
     (config) => {
-        const token = localStorage.getItem('token');
+        const token = localStorage.getItem('access_token');
         if (token) {
             config.headers.Authorization = `Bearer ${token}`;
         }
@@ -46,13 +51,17 @@ API.interceptors.response.use(
                     originalRequest.headers.Authorization = `Bearer ${access}`;
                     return API(originalRequest);
                 }
-            } catch (err) {
-                console.error('Error al renovar el token:', err);
+            } catch {
                 // Redirige al usuario al login si no se puede renovar el token
                 localStorage.removeItem('access_token');
                 localStorage.removeItem('refresh_token');
-                window.location.href = '/auth/login';
+                redirectToLogin();
             }
+        }
+
+        // Manejo de otros errores genéricos
+        if (error.response?.status && error.response.status !== 401) {
+            console.error(`Error HTTP ${error.response.status}:`, error.response.data);
         }
 
         return Promise.reject(error);
