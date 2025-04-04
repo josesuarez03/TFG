@@ -18,7 +18,11 @@ import { FcGoogle } from "react-icons/fc";
 const loginSchema = z.object({
   email: z.string()
       .min(1, { message: 'El email es obligatorio' })
-      .email({ message: 'Email inválido' }),
+      .email({ message: 'Email inválido' })
+      .regex(
+          /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/,
+          { message: 'El email debe tener un formato válido (ejemplo@dominio.com)' }
+      ),
   password: z.string()
       .min(8, { message: 'La contraseña debe tener al menos 8 caracteres' })
       .regex(/[A-Z]/, { message: 'Debe contener al menos una letra mayúscula' })
