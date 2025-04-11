@@ -69,8 +69,8 @@ except (ImportError, ModuleNotFoundError) as e:
 
 class Config:
     # Configuraciones de la aplicación
-    DEBUG = os.getenv('DEBUG', 'True') == 'True'
-    SECRET_KEY = os.getenv("DJANGO_SECRET_KEY", "default_secret_key")
+    DEBUG = os.getenv('DEBUG') == 'True'
+    SECRET_KEY = os.getenv("DJANGO_SECRET_KEY")
 
     # Credenciales para Amazon Web Services
     AWS_ACCESS_KEY = os.getenv("AWS_ACCESS_KEY")
@@ -81,16 +81,17 @@ class Config:
     MONGO_HOST = os.getenv("MONGO_HOST", "localhost")
     MONGO_PORT = int(os.getenv("MONGO_PORT", "27017"))
     MONGO_DB = os.getenv("MONGO_INITDB_DATABASE", "DB")
-    MONGO_USER = os.getenv("MONGO_INITDB_ROOT_USERNAME", "root")
-    MONGO_PASS = os.getenv("MONGO_INITDB_ROOT_PASSWORD", "1234")
+    MONGO_USER = os.getenv("MONGO_INITDB_ROOT_USERNAME")
+    MONGO_PASS = os.getenv("MONGO_INITDB_ROOT_PASSWORD")
 
     # Configuración Redis - usar nombres de host de Docker si estamos en contenedores
-    REDIS_HOST = os.getenv("REDIS_HOST", "localhost")
-    REDIS_PORT = int(os.getenv("REDIS_PORT", "6379"))
+    REDIS_HOST = os.getenv("REDIS_HOST")
+    REDIS_PORT = int(os.getenv("REDIS_PORT"))
+    REDIS_DB = int(os.getenv("REDIS_DB"))
 
     # Usar la clave secreta de Django si está disponible
-    JWT_SECRET = DJANGO_SECRET_KEY or os.getenv("JWT_SECRET", "default_jwt_secret")
-    JWT_ALGORITHM = JWT_ALGORITHM or os.getenv("JWT_ALGORITHM", "HS256")
+    JWT_SECRET = DJANGO_SECRET_KEY or os.getenv("JWT_SECRET")
+    JWT_ALGORITHM = JWT_ALGORITHM or os.getenv("JWT_ALGORITHM")
 
     # Integración con Django
     DJANGO_INTEGRATION = DJANGO_INTEGRATION

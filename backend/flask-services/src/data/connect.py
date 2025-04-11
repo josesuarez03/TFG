@@ -6,7 +6,7 @@ MONGO_URI = f"mongodb://{Config.MONGO_USER}:{Config.MONGO_PASS}@{Config.MONGO_HO
 mongo_client = pymongo.MongoClient(MONGO_URI)
 mongo_db = mongo_client[Config.MONGO_DB]
 
-redis_client = redis.Redis(host=Config.REDIS_HOST, port=Config.REDIS_PORT, db=0)
+redis_client = redis.Redis(host=Config.REDIS_HOST, port=Config.REDIS_PORT, db=Config.REDIS_DB)
 
 # Verificar conexiones
 try:
