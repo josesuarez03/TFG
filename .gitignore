@@ -510,3 +510,6 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+*.zip
+*.tar.gz
