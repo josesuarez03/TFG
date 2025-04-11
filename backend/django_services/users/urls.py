@@ -4,7 +4,8 @@ from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 
 from .views import (
     RegisterUserView, GoogleOAuthLoginView, CompleteProfileView,
-    UserProfileView, UserViewSet
+    UserProfileView, UserViewSet, PasswordResetRequestView, 
+    PasswordResetVerifyView, ChangePasswordView, AccountDeleteView
 )
 
 router = DefaultRouter()
@@ -23,6 +24,14 @@ urlpatterns = [
     # Perfil de usuario
     path('profile/complete/', CompleteProfileView.as_view(), name='complete_profile'),
     path('profile/', UserProfileView.as_view(), name='user_profile'),
+    
+    # Gestión de contraseñas
+    path('password/reset/request/', PasswordResetRequestView.as_view(), name='password_reset_request'),
+    path('password/reset/verify/', PasswordResetVerifyView.as_view(), name='password_reset_verify'),
+    path('password/change/', ChangePasswordView.as_view(), name='change_password'),
+    
+    # Eliminación de cuenta
+    path('account/delete/', AccountDeleteView.as_view(), name='account_delete'),
     
     # ViewSet de administración de usuarios
     path('', include(router.urls)),
