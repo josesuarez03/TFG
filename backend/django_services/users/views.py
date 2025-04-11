@@ -13,10 +13,17 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from social_django.utils import load_strategy, load_backend
 from social_core.exceptions import MissingBackend, AuthTokenError, AuthForbidden
 
+from django.core.mail import send_mail
+from django.template.loader import render_to_string
+from django.utils.crypto import get_random_string
+from django.core.cache import cache
+
 from .serializers import (
     UserSerializer, UserProfileSerializer, UserProfileSerializerBasic,
     GoogleOAuthUserInfoSerializer, RequiredOAuthUserSerializer, 
-    PatientSerializer, DoctorSerializer, ChatbotAnalysisSerializer
+    PatientSerializer, DoctorSerializer, ChatbotAnalysisSerializer,
+    PasswordResetRequestSerializer, PasswordResetVerifySerializer,
+    ChangePasswordSerializer, AccountDeleteSerializer
 )
 from .models import Patient, Doctor
 
@@ -338,3 +345,182 @@ class DoctorViewSet(viewsets.ModelViewSet):
         instance = self.get_object()
         serializer = self.get_serializer(instance)
         # Incluir información
+
+class PasswordResetRequestView(APIView):
+    """Vista para solicitar el restablecimiento de contraseña por código de verificación"""
+    permission_classes = [AllowAny]
+    serializer_class = PasswordResetRequestSerializer
+    
+    def post(self, request):
+        serializer = self.serializer_class(data=request.data)
+        if serializer.is_valid():
+            email = serializer.validated_data['email']
+            try:
+                user = User.objects.get(email=email)
+                
+                # Generar un código de verificación de 6 dígitos
+                verification_code = get_random_string(6, '0123456789')
+                
+                # Guardar el código en caché con un tiempo de expiración (15 minutos)
+                cache_key = f"pwd_reset_{user.id}"
+                cache.set(cache_key, verification_code, timeout=900)  # 900 segundos = 15 minutos
+                
+                # Enviar correo con el código de verificación
+                subject = 'Código de verificación para restablecer tu contraseña'
+                html_message = render_to_string('password_reset_email.html', {
+                    'user': user,
+                    'code': verification_code,
+                    'valid_time': '15 minutos'
+                })
+                plain_message = f"""
+                Hola {user.first_name},
+                
+                Has solicitado restablecer tu contraseña. Utiliza el siguiente código de verificación:
+                
+                {verification_code}
+                
+                Este código es válido por 15 minutos.
+                
+                Si no has solicitado este cambio, ignora este mensaje.
+                
+                Saludos,
+                El equipo de soporte
+                """
+                
+                send_mail(
+                    subject,
+                    plain_message,
+                    settings.EMAIL_HOST_USER,
+                    [email],
+                    html_message=html_message,
+                    fail_silently=False,
+                )
+                
+                return Response(
+                    {
+                        "message": "Se ha enviado un código de verificación a tu correo electrónico.",
+                        "expires_in": "15 minutos"
+                    },
+                    status=status.HTTP_200_OK
+                )
+            except User.DoesNotExist:
+                # No revelamos si el correo existe o no por seguridad
+                return Response(
+                    {"message": "Si existe una cuenta con este correo, recibirás un código de verificación."},
+                    status=status.HTTP_200_OK
+                )
+                
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+class PasswordResetVerifyView(APIView):
+    """Vista para verificar el código y restablecer la contraseña"""
+    permission_classes = [AllowAny]
+    serializer_class = PasswordResetVerifySerializer
+    
+    def post(self, request):
+        serializer = self.serializer_class(data=request.data)
+        if serializer.is_valid():
+            email = serializer.validated_data['email']
+            code = serializer.validated_data['code']
+            new_password = serializer.validated_data['new_password']
+            
+            try:
+                user = User.objects.get(email=email)
+                
+                # Recuperar el código de verificación de la caché
+                cache_key = f"pwd_reset_{user.id}"
+                stored_code = cache.get(cache_key)
+                
+                if not stored_code or stored_code != code:
+                    return Response(
+                        {"error": "El código de verificación es inválido o ha expirado."},
+                        status=status.HTTP_400_BAD_REQUEST
+                    )
+                
+                # Establecer la nueva contraseña
+                user.set_password(new_password)
+                user.save()
+                
+                # Eliminar el código de la caché
+                cache.delete(cache_key)
+                
+                return Response(
+                    {"message": "Tu contraseña ha sido restablecida correctamente. Ahora puedes iniciar sesión."},
+                    status=status.HTTP_200_OK
+                )
+                
+            except User.DoesNotExist:
+                return Response(
+                    {"error": "No se encontró ninguna cuenta con este correo electrónico."},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+                
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+class ChangePasswordView(APIView):
+    """Vista para cambiar la contraseña estando autenticado"""
+    permission_classes = [IsAuthenticated]
+    serializer_class = ChangePasswordSerializer
+    
+    def post(self, request):
+        serializer = self.serializer_class(data=request.data)
+        if serializer.is_valid():
+            user = request.user
+            
+            # Verificar la contraseña actual
+            if not user.check_password(serializer.validated_data['old_password']):
+                return Response(
+                    {"old_password": ["La contraseña actual es incorrecta."]},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+                
+            # Establecer la nueva contraseña
+            user.set_password(serializer.validated_data['new_password'])
+            user.save()
+            
+            return Response(
+                {"message": "Tu contraseña ha sido cambiada correctamente."},
+                status=status.HTTP_200_OK
+            )
+            
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+class AccountDeleteView(APIView):
+    """Vista para eliminación segura de cuenta con contraseña"""
+    permission_classes = [IsAuthenticated]
+    serializer_class = AccountDeleteSerializer
+    
+    def post(self, request):
+        serializer = self.serializer_class(data=request.data)
+        if serializer.is_valid():
+            password = serializer.validated_data.get('password')
+            
+            # Para cuentas OAuth no se requiere contraseña
+            if request.user.oauth_provider and request.user.oauth_uid:
+                request.user.delete()
+                return Response(
+                    {"message": "Tu cuenta ha sido eliminada correctamente."},
+                    status=status.HTTP_204_NO_CONTENT
+                )
+                
+            # Para cuentas con contraseña, verificar la contraseña
+            if not password:
+                return Response(
+                    {"error": "Debes proporcionar tu contraseña para eliminar la cuenta."},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+                
+            if not request.user.check_password(password):
+                return Response(
+                    {"error": "La contraseña proporcionada es incorrecta."},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+                
+            # Eliminar la cuenta
+            request.user.delete()
+            return Response(
+                {"message": "Tu cuenta ha sido eliminada correctamente."},
+                status=status.HTTP_204_NO_CONTENT
+            )
+        
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
