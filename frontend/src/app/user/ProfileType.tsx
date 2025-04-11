@@ -18,7 +18,7 @@ export default function ProfileType() {
     const handleCreateAccount = () => {
         if (selectedType) {
             router.push({
-                pathname: '/register',
+                pathname: '/auth/register',
                 query: { type: selectedType }
             });
         }
@@ -105,7 +105,7 @@ export default function ProfileType() {
                 
                 <p>
                     ¿Ya tienes una cuenta?{" "}
-                    <Link href="/login" className="text-green-600 hover:underline font-medium">
+                    <Link href="/auth/login" className="text-green-600 hover:underline font-medium">
                         Inicia sesión aquí
                     </Link>
                 </p>

@@ -8,12 +8,12 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
-import { Alert } from "@/components/ui/alert";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { LockClosedIcon, MailIcon, UserCircleIcon } from '@heroicons/react/outline';
 import { FcGoogle } from "react-icons/fc";
+import { MdLock, MdEmail, MdPerson } from "react-icons/md";
 
 const loginSchema = z.object({
   email: z.string()
@@ -85,11 +85,15 @@ export default function Login() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            {authError && <Alert variant="destructive">{authError}</Alert>}
+            {authError && (
+              <Alert variant="destructive" className="mb-4">
+                <AlertDescription>{authError}</AlertDescription>
+              </Alert>
+            )}
             <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
               <div>
                 <Label>
-                  <MailIcon className="w-5 h-5 inline-block mr-2 text-gray-500" />
+                  <MdEmail className="w-5 h-5 inline-block mr-2 text-gray-500" />
                   Email
                 </Label>
                 <Input type="email" {...register('email')} />
@@ -97,7 +101,7 @@ export default function Login() {
               </div>
               <div>
                   <Label>
-                    <LockClosedIcon className="w-5 h-5 inline-block mr-2 text-gray-500" />
+                    <MdLock className="w-5 h-5 inline-block mr-2 text-gray-500" />
                     Contraseña
                   </Label>
                   <Input type="password" {...register('password')} />
@@ -105,16 +109,13 @@ export default function Login() {
               </div>
                 <Button type="submit" disabled={loading} className="w-full flex items-center justify-center space-x-2">
                   {loading ? (
-                    <>
-                      <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
-                      </svg>
-                      <span>Cargando...</span>
-                    </>
+                    <div className="flex items-center justify-center">
+                      <svg className="animate-spin h-5 w-5 mr-3 text-white" viewBox="0 0 24 24"></svg>
+                      <span className="text-white">Cargando...</span>
+                    </div>
                   ) : (
                     <>
-                      <UserCircleIcon className="w-5 h-5 text-white" />
+                      <MdPerson className="w-5 h-5 text-white" />
                       <span>Ingresar</span>
                     </>
                   )}
@@ -145,7 +146,7 @@ export default function Login() {
             </div>
           </CardContent>
           <CardFooter className="text-center">
-              <p>¿No tienes cuenta? <Link href="/register" className="text-blue-500 hover:underline">Regístrate</Link></p>
+              <p>¿No tienes cuenta? <Link href="/auth/register" className="text-blue-500 hover:underline">Regístrate</Link></p>
           </CardFooter>
         </Card>
     );
