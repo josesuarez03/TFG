@@ -157,3 +157,34 @@ class ChatbotAnalysisSerializer(serializers.Serializer):
     medications = serializers.CharField(required=False, allow_null=True)
     medical_history = serializers.CharField(required=False, allow_null=True)
     ocupacion = serializers.CharField(required=False, allow_null=True)
+
+class PasswordResetRequestSerializer(serializers.Serializer):
+    email = serializers.EmailField(required=True)
+    def validate_email(self, value):
+        if not User.objects.filter(email=value).exists():
+            raise serializers.ValidationError("No existe un usuario con este correo electrónico.")
+        return value
+
+class PasswordResetVerifySerializer(serializers.Serializer):
+    email = serializers.EmailField(required=True)
+    code = serializers.CharField(required=True, min_length=6, max_length=6)
+    new_password = serializers.CharField(required=True)
+    confirm_password = serializers.CharField(required=True)
+    
+    def validate(self, data):
+        if data['new_password'] != data['confirm_password']:
+            raise serializers.ValidationError({"confirm_password": "Las contraseñas no coinciden"})
+        return data
+    
+class ChangePasswordSerializer(serializers.Serializer):
+    old_password = serializers.CharField(required=True)
+    new_password = serializers.CharField(required=True)
+    confirm_password = serializers.CharField(required=True)
+    
+    def validate(self, data):
+        if data['new_password'] != data['confirm_password']:
+            raise serializers.ValidationError({"confirm_password": "Las contraseñas no coinciden"})
+        return data
+
+class AccountDeleteSerializer(serializers.Serializer):
+    password = serializers.CharField(required=False)
