@@ -1,8 +1,11 @@
 import { useState, useEffect, useCallback } from "react";
 import API from "@/services/api";
-import {jwtDecode} from "jwt-decode";
+import { jwtDecode } from "jwt-decode";
 import { useRouter } from "next/router";
-import { LoginResponse, User } from "@/types/auth";
+import { LoginResponse } from "@/types/auth";
+import { UserProfile } from "@/types/user";
+
+type User = UserProfile;
 
 export const useAuth = () => {
     const router = useRouter();
@@ -22,7 +25,7 @@ export const useAuth = () => {
 
     // Función para manejar redirecciones
     const handleRedirection = (isProfileCompleted?: boolean) => {
-        if (isProfileCompleted) {
+        if (!isProfileCompleted) {
             router.push("/profile/complete");
         } else {
             router.push("/dashboard");
@@ -58,7 +61,11 @@ export const useAuth = () => {
         setError(null);
 
         try {
-            const response = await API.post<LoginResponse>("auth/google/", { token });
+            const profileType = localStorage.getItem('selectedProfileType') || 'patient';
+            const response = await API.post<LoginResponse>("auth/google/", { 
+                token,
+                tipo: profileType
+            });
             const { access, refresh } = response.data;
 
             localStorage.setItem("access_token", access);
