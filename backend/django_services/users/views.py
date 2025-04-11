@@ -42,7 +42,7 @@ class RegisterUserView(generics.CreateAPIView):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
     
 class GoogleOAuthLoginView(APIView):
-    """Vista para autenticación con Google"""
+    """Vista para autenticación con Google (login o registro)"""
     permission_classes = [AllowAny]
     serializer_class = GoogleOAuthUserInfoSerializer
 
@@ -75,11 +75,14 @@ class GoogleOAuthLoginView(APIView):
             user.oauth_provider = 'google'
             if not user.oauth_uid and hasattr(user, 'social_user'):
                 user.oauth_uid = user.social_user.uid
-            user.save(update_fields=['oauth_provider', 'oauth_uid'])
                 
-            # Verificar si es un usuario nuevo o existente
+            # Si se proporciona el tipo de usuario en la solicitud y es un usuario nuevo
             is_new_user = user.date_joined == user.last_login
-            
+            if is_new_user and 'tipo' in request.data:
+                user.tipo = request.data.get('tipo', 'patient')
+                
+            user.save(update_fields=['oauth_provider', 'oauth_uid', 'tipo'])
+                
             # Generar tokens JWT
             refresh = RefreshToken.for_user(user)
             
