@@ -181,10 +181,25 @@ export default function UserProfile() {
                     </div>
                 </CardContent>
                 
-                <CardFooter className="flex justify-center border-t pt-6 mt-6">
-                    <p className="text-sm text-gray-500">
+                <CardFooter className="flex flex-col sm:flex-row justify-between items-center border-t pt-6 mt-6">
+                    <p className="text-sm text-gray-500 mb-4 sm:mb-0">
                         Miembro desde {formatDate(user.date_joined)}
                     </p>
+                    <div className="flex flex-col sm:flex-row items-center space-y-4 sm:space-y-0 sm:space-x-4">
+                        <Button 
+                            onClick={() => router.push('/profile/change-password')} 
+                            className="w-full sm:w-auto"
+                        >
+                            Cambiar Contraseña
+                        </Button>
+                        <Button 
+                            onClick={() => router.push('/profile/delete-account')} 
+                            variant="destructive" 
+                            className="w-full sm:w-auto"
+                        >
+                            Eliminar Cuenta
+                        </Button>
+                    </div>
                 </CardFooter>
             </Card>
         </div>
