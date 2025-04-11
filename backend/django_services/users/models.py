@@ -38,42 +38,65 @@ class User(AbstractUser):
     def __str__(self):
         return f"{self.email} ({self.get_tipo_display()})"
     
-    def check_profile_completion(self):
+    def check_profile_completion(self, **kwargs):
         """Verifica si el perfil del usuario está completo según su tipo"""
+        # Campos base que son requeridos para todos los tipos de usuarios
         base_fields = [self.first_name, self.last_name, self.fecha_nacimiento, self.telefono, self.direccion]
         
-        if self.tipo == 'patient' and getattr(self, 'patient', None):
-            if all(base_fields):
-                self.is_profile_completed = True
-                if self.patient.allergies and self.patient.ocupacion:
+        if self.tipo == 'patient':
+            # Para pacientes, solo verificamos que los campos base estén completos
+            # y que el modelo Patient esté creado (los campos médicos pueden estar vacíos)
+            patient = getattr(self, 'patient', None)
+            if all(base_fields) and patient is not None:
+                # La ocupación y alergias son los únicos campos requeridos inicialmente
+                if patient.ocupacion and patient.allergies:
                     self.is_profile_completed = True
+                else:
+                    self.is_profile_completed = False
             else:
                 self.is_profile_completed = False
                 
-        elif self.tipo == 'doctor' and getattr(self, 'doctor', None):
-            if all(base_fields) and self.doctor.especialidad and self.doctor.numero_licencia:
-                self.is_profile_completed = True
+        elif self.tipo == 'doctor':
+            # Para doctores, verificamos campos base y profesionales
+            doctor = getattr(self, 'doctor', None)
+            if all(base_fields) and doctor is not None:
+                if doctor.especialidad and doctor.numero_licencia:
+                    self.is_profile_completed = True
+                else:
+                    self.is_profile_completed = False
             else:
                 self.is_profile_completed = False
                 
-        elif self.tipo in 'admin':
-            # Para personal administrativo, solo información básica
+        elif self.tipo == 'admin':
+            # Para administradores, solo la información básica
             if all(base_fields):
                 self.is_profile_completed = True
             else:
                 self.is_profile_completed = False
-                
-        self.save(update_fields=['is_profile_completed'])
+        
+        # Guardar solo el campo actualizado para evitar modificar otros campos
+        # si este método se llama como parte de otro proceso de guardado
+        if 'update_fields' not in kwargs or kwargs['update_fields'] is None:
+            self.save(update_fields=['is_profile_completed'])
+        elif 'is_profile_completed' not in kwargs['update_fields']:
+            kwargs['update_fields'].append('is_profile_completed')
+            self.save(**kwargs)
         return self.is_profile_completed
     
     def save(self, *args, **kwargs):
         # Sanitizar los campos sensibles antes de guardar
-        self.first_name = sanitize_input(self.first_name)
-        self.last_name = sanitize_input(self.last_name)
-        self.telefono = sanitize_input(self.telefono)
-        self.direccion = sanitize_input(self.direccion)
-        self.oauth_provider = sanitize_input(self.oauth_provider)
-        self.oauth_uid = sanitize_input(self.oauth_uid)
+        if self.first_name:
+            self.first_name = sanitize_input(self.first_name)
+        if self.last_name:
+            self.last_name = sanitize_input(self.last_name)
+        if self.telefono:
+            self.telefono = sanitize_input(self.telefono)
+        if self.direccion:
+            self.direccion = sanitize_input(self.direccion)
+        if self.oauth_provider:
+            self.oauth_provider = sanitize_input(self.oauth_provider)
+        if self.oauth_uid:
+            self.oauth_uid = sanitize_input(self.oauth_uid)
         super().save(*args, **kwargs)
 
     
@@ -81,6 +104,7 @@ class Patient(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='patient')
 
+    # Campos que pueden ser completados por el chatbot
     triaje_level = models.CharField(max_length=20, blank=True, null=True)
     ocupacion = models.CharField(max_length=100, blank=True, null=True)
     pain_scale = models.IntegerField(blank=True, null=True)
@@ -88,6 +112,9 @@ class Patient(models.Model):
     allergies = models.TextField(blank=True, null=True)
     medications = models.TextField(blank=True, null=True)
     medical_history = models.TextField(blank=True, null=True)
+    
+    # Campo para seguimiento del análisis del chatbot
+    last_chatbot_analysis = models.DateTimeField(blank=True, null=True)
     
     class Meta:
         verbose_name = _('paciente')
@@ -98,21 +125,34 @@ class Patient(models.Model):
     
     def save(self, *args, **kwargs):
         # Asegurar que el tipo de usuario es paciente
-        if self.usuario.tipo != 'paciente':
-            self.usuario.tipo = 'paciente'
-            self.usuario.save(update_fields=['tipo'])
+        if self.user.tipo != 'patient':
+            self.user.tipo = 'patient'
+            self.user.save(update_fields=['tipo'])
 
-        self.triaje_level = sanitize_input(self.triaje_level)
-        self.ocupacion = sanitize_input(self.ocupacion)
-        self.medical_context = sanitize_input(self.medical_context)
-        self.allergies = sanitize_input(self.allergies)
-        self.medications = sanitize_input(self.medications)
-        self.medical_history = sanitize_input(self.medical_history)
+        # Sanitizar los campos proporcionados
+        if self.triaje_level:
+            self.triaje_level = sanitize_input(self.triaje_level)
+        if self.ocupacion:
+            self.ocupacion = sanitize_input(self.ocupacion)
+        if self.medical_context:
+            self.medical_context = sanitize_input(self.medical_context)
+        if self.allergies:
+            self.allergies = sanitize_input(self.allergies)
+        if self.medications:
+            self.medications = sanitize_input(self.medications)
+        if self.medical_history:
+            self.medical_history = sanitize_input(self.medical_history)
 
         super().save(*args, **kwargs)
 
     def update_from_chatbot_analysis(self, analysis_data):
-
+        """
+        Actualiza los campos del paciente con la información analizada por el chatbot
+        Parámetro:
+            analysis_data (dict): Diccionario con los datos analizados por el chatbot
+        Retorna:
+            bool: True si se actualizaron campos, False en caso contrario
+        """
         import datetime
         
         # Campos que pueden ser actualizados desde el chatbot
@@ -135,6 +175,8 @@ class Patient(models.Model):
         # Guardar cambios si hay algún campo actualizado
         if fields_updated:
             self.save(update_fields=fields_updated)
+            # Verificar si con estos cambios el perfil ahora está completo
+            self.user.check_profile_completion()
             return True
         
         return False
@@ -156,10 +198,12 @@ class Doctor(models.Model):
     
     def save(self, *args, **kwargs):
         # Asegurar que el tipo de usuario es doctor
-        if self.usuario.tipo != 'doctor':
-            self.usuario.tipo = 'doctor'
-            self.usuario.save(update_fields=['tipo'])
+        if self.user.tipo != 'doctor':
+            self.user.tipo = 'doctor'
+            self.user.save(update_fields=['tipo'])
 
-        self.especialidad = sanitize_input(self.especialidad)
-        self.numero_licencia = sanitize_input(self.numero_licencia)
+        if self.especialidad:
+            self.especialidad = sanitize_input(self.especialidad)
+        if self.numero_licencia:
+            self.numero_licencia = sanitize_input(self.numero_licencia)
         super().save(*args, **kwargs)

@@ -15,7 +15,8 @@ from social_core.exceptions import MissingBackend, AuthTokenError, AuthForbidden
 
 from .serializers import (
     UserSerializer, UserProfileSerializer, UserProfileSerializerBasic,
-    GoogleOAuthUserInfoSerializer, RequiredOAuthUserSerializer, PatientSerializer, DoctorSerializer
+    GoogleOAuthUserInfoSerializer, RequiredOAuthUserSerializer, 
+    PatientSerializer, DoctorSerializer, ChatbotAnalysisSerializer
 )
 from .models import Patient, Doctor
 
@@ -172,7 +173,7 @@ class UserProfileView(generics.RetrieveUpdateDestroyAPIView):
         
         if serializer.is_valid():
             # Actualizar campos básicos del usuario
-            for field in ['first_name', 'last_name', 'email', 'telefono', 'direccion', 'genero']:
+            for field in ['first_name', 'last_name', 'telefono', 'direccion', 'genero']:
                 if field in serializer.validated_data:
                     setattr(user, field, serializer.validated_data[field])
             
@@ -221,3 +222,119 @@ class UserViewSet(viewsets.ModelViewSet):
             
         serializer = UserProfileSerializerBasic(users, many=True)
         return Response(serializer.data)
+
+class ChatbotPatientUpdateView(APIView):
+    """
+    Vista para que el chatbot actualice la información médica de un paciente
+    """
+    permission_classes = [IsAuthenticated]
+    
+    def post(self, request, patient_id=None):
+        # Si no se proporciona patient_id, usar el del usuario actual si es paciente
+        if not patient_id and request.user.tipo == 'patient':
+            try:
+                patient = request.user.patient
+            except Patient.DoesNotExist:
+                return Response(
+                    {"error": "El usuario actual no tiene un perfil de paciente"},
+                    status=status.HTTP_404_NOT_FOUND
+                )
+        else:
+            # Si se proporciona un ID o el usuario es médico/admin, verificar permisos
+            if not patient_id:
+                return Response(
+                    {"error": "Se requiere un ID de paciente"},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+                
+            # Los médicos y admin pueden actualizar cualquier paciente
+            if request.user.tipo not in ['doctor', 'admin']:
+                return Response(
+                    {"error": "No tiene permisos para actualizar este paciente"},
+                    status=status.HTTP_403_FORBIDDEN
+                )
+                
+            try:
+                patient = Patient.objects.get(id=patient_id)
+            except Patient.DoesNotExist:
+                return Response(
+                    {"error": "Paciente no encontrado"},
+                    status=status.HTTP_404_NOT_FOUND
+                )
+        
+        # Validar los datos proporcionados por el chatbot
+        analysis_data = request.data.get('analysis_data', {})
+        serializer = ChatbotAnalysisSerializer(data=analysis_data)
+        
+        if not serializer.is_valid():
+            return Response(
+                {"error": "Datos de análisis inválidos", "details": serializer.errors},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+            
+        # Actualizar la información del paciente
+        updated = patient.update_from_chatbot_analysis(serializer.validated_data)
+        
+        if updated:
+            return Response({
+                "message": "Información del paciente actualizada correctamente",
+                "patient": PatientSerializer(patient).data,
+                "profile_complete": patient.user.is_profile_completed
+            }, status=status.HTTP_200_OK)
+        else:
+            return Response({
+                "message": "No se realizaron cambios en la información del paciente"
+            }, status=status.HTTP_200_OK)
+
+class PatientViewSet(viewsets.ModelViewSet):
+    """ViewSet para administrar pacientes (doctor y admin)"""
+    queryset = Patient.objects.all()
+    serializer_class = PatientSerializer
+    permission_classes = [IsAuthenticated]
+    
+    def get_queryset(self):
+        user = self.request.user
+        # Los pacientes solo pueden ver su propio perfil
+        if user.tipo == 'patient':
+            return Patient.objects.filter(user=user)
+        # Doctores y administradores pueden ver todos los pacientes
+        elif user.tipo in ['doctor', 'admin']:
+            return Patient.objects.all()
+        return Patient.objects.none()
+    
+    def retrieve(self, request, *args, **kwargs):
+        instance = self.get_object()
+        serializer = self.get_serializer(instance)
+        # Incluir información del usuario asociado
+        user_data = UserProfileSerializerBasic(instance.user).data
+        data = serializer.data
+        data['user'] = user_data
+        return Response(data)
+
+class DoctorViewSet(viewsets.ModelViewSet):
+    """ViewSet para administrar doctores (solo admin)"""
+    queryset = Doctor.objects.all()
+    serializer_class = DoctorSerializer
+    
+    def get_permissions(self):
+        if self.action in ['list', 'retrieve']:
+            return [IsAuthenticated()]
+        return [IsAdminUser()]
+    
+    def get_queryset(self):
+        user = self.request.user
+        # Los doctores solo pueden ver su propio perfil
+        if user.tipo == 'doctor':
+            return Doctor.objects.filter(user=user)
+        # Administradores pueden ver todos los doctores
+        elif user.tipo == 'admin':
+            return Doctor.objects.all()
+        # Pacientes pueden ver la lista de doctores pero sin detalles sensibles
+        elif user.tipo == 'patient' and self.action == 'list':
+            return Doctor.objects.all()
+        return Doctor.objects.none()
+    
+    def retrieve(self, request, *args, **kwargs):
+        instance = self.get_object()
+        serializer = self.get_serializer(instance)
+        # Incluir información

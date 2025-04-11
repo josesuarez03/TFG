@@ -16,7 +16,7 @@ class UserSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = User
-        fields = ('email', 'username', 'password', 'password2', 'first_name', 'last_name', 'tipo')
+        fields = ('id', 'email', 'username', 'password', 'password2', 'first_name', 'last_name', 'tipo')
         extra_kwargs = {
             'first_name': {'required': True},
             'last_name': {'required': True}
@@ -43,13 +43,15 @@ class UserSerializer(serializers.ModelSerializer):
 class PatientSerializer(serializers.ModelSerializer):
     class Meta:
         model = Patient
-        fields = ('triaje_level', 'ocupacion', 'pain_scale', 'medical_context', 
-                  'allergies', 'medications', 'medical_history')
+        fields = ('id', 'triaje_level', 'ocupacion', 'pain_scale', 'medical_context', 
+                  'allergies', 'medications', 'medical_history', 'last_chatbot_analysis')
+        read_only_fields = ('id', 'last_chatbot_analysis')
 
 class DoctorSerializer(serializers.ModelSerializer):
     class Meta:
         model = Doctor
-        fields = ('especialidad', 'numero_licencia')
+        fields = ('id', 'especialidad', 'numero_licencia')
+        read_only_fields = ('id',)
 
 class UserProfileSerializer(serializers.ModelSerializer):
     patient = PatientSerializer(required=False)
@@ -57,10 +59,12 @@ class UserProfileSerializer(serializers.ModelSerializer):
     
     class Meta:
         model = User
-        fields = ('email', 'username', 'first_name', 'last_name', 'tipo',
+        fields = ('id', 'email', 'username', 'first_name', 'last_name', 'tipo',
                   'fecha_nacimiento', 'genero', 'telefono', 'direccion', 
-                  'is_profile_completed', 'patient', 'doctor')
-        read_only_fields = ('email', 'username', 'is_profile_completed')
+                  'is_profile_completed', 'patient', 'doctor', 'date_joined', 
+                  'last_login', 'is_active')
+        read_only_fields = ('id', 'email', 'username', 'is_profile_completed', 
+                            'date_joined', 'last_login')
 
     def update(self, instance, validated_data):
         patient_data = validated_data.pop('patient', None)
@@ -92,8 +96,10 @@ class UserProfileSerializer(serializers.ModelSerializer):
 class UserProfileSerializerBasic(serializers.ModelSerializer):
     class Meta:
         model = User
-        fields = ('email', 'username', 'first_name', 'last_name', 'is_profile_completed')
-        read_only_fields = ('email', 'username', 'is_profile_completed')
+        fields = ('id', 'email', 'username', 'first_name', 'last_name', 
+                 'is_profile_completed', 'is_active', 'date_joined', 'last_login', 'tipo')
+        read_only_fields = ('id', 'email', 'username', 'is_profile_completed', 
+                           'date_joined', 'last_login')
 
     def update(self, instance, validated_data):
         for attr, value in validated_data.items():
@@ -114,7 +120,7 @@ class RequiredOAuthUserSerializer(serializers.Serializer):
     direccion = serializers.CharField(required=True)
     genero = serializers.CharField(required=False)
     
-    # Campos para pacientes
+    # Campos para pacientes - Estos son los únicos requeridos inicialmente
     allergies = serializers.CharField(required=False)
     ocupacion = serializers.CharField(required=False)
     
@@ -127,15 +133,27 @@ class RequiredOAuthUserSerializer(serializers.Serializer):
         
         # Validar campos según el tipo de usuario
         if tipo == 'patient':
+            # Pacientes requieren al menos ocupación y alergias inicialmente
             if not attrs.get('allergies'):
                 raise serializers.ValidationError({"allergies": "Este campo es requerido para pacientes"})
             if not attrs.get('ocupacion'):
                 raise serializers.ValidationError({"ocupacion": "Este campo es requerido para pacientes"})
         
         elif tipo == 'doctor':
+            # Médicos requieren especialidad y número de licencia
             if not attrs.get('especialidad'):
                 raise serializers.ValidationError({"especialidad": "Este campo es requerido para médicos"})
             if not attrs.get('numero_licencia'):
                 raise serializers.ValidationError({"numero_licencia": "Este campo es requerido para médicos"})
         
         return attrs
+
+class ChatbotAnalysisSerializer(serializers.Serializer):
+    """Serializador para validar datos del análisis del chatbot"""
+    triaje_level = serializers.CharField(required=False, allow_null=True)
+    pain_scale = serializers.IntegerField(required=False, allow_null=True)
+    medical_context = serializers.CharField(required=False, allow_null=True)
+    allergies = serializers.CharField(required=False, allow_null=True)
+    medications = serializers.CharField(required=False, allow_null=True)
+    medical_history = serializers.CharField(required=False, allow_null=True)
+    ocupacion = serializers.CharField(required=False, allow_null=True)
