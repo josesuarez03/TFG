@@ -158,13 +158,39 @@ class CompleteProfileView(generics.UpdateAPIView):
         
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-class UserProfileView(generics.RetrieveUpdateAPIView):
-    """Vista para ver y actualizar perfil de usuario"""
+class UserProfileView(generics.RetrieveUpdateDestroyAPIView):
+    """Vista para ver, actualizar y eliminar el perfil del usuario"""
     serializer_class = UserProfileSerializer
     permission_classes = [IsAuthenticated]
     
     def get_object(self):
         return self.request.user
+
+    def update(self, request, *args, **kwargs):
+        user = self.get_object()
+        serializer = self.get_serializer(user, data=request.data, partial=True)
+        
+        if serializer.is_valid():
+            # Actualizar campos básicos del usuario
+            for field in ['first_name', 'last_name', 'email', 'telefono', 'direccion', 'genero']:
+                if field in serializer.validated_data:
+                    setattr(user, field, serializer.validated_data[field])
+            
+            user.save()
+            
+            return Response({
+                'user': UserProfileSerializer(user).data,
+                'message': 'Perfil actualizado correctamente.'
+            }, status=status.HTTP_200_OK)
+        
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    def destroy(self, request, *args, **kwargs):
+        user = self.get_object()
+        user.delete()
+        return Response({
+            'message': 'Cuenta eliminada correctamente.'
+        }, status=status.HTTP_204_NO_CONTENT)
 
 class UserViewSet(viewsets.ModelViewSet):
     """ViewSet para administrar usuarios (solo admin)"""
