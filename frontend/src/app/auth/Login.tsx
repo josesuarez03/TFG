@@ -99,13 +99,19 @@ export default function Login() {
                 <Input type="email" {...register('email')} />
                 {errors.email && <p className="text-red-500 text-sm">{errors.email.message}</p>}
               </div>
-              <div>
+              <div className="relative">
                   <Label>
-                    <MdLock className="w-5 h-5 inline-block mr-2 text-gray-500" />
-                    Contraseña
+                      <MdLock className="w-5 h-5 inline-block mr-2 text-gray-500" />
+                      Contraseña
                   </Label>
                   <Input type="password" {...register('password')} />
-                  {errors.password && <p className="text-red-500 text-sm">{errors.password.message}</p>}
+                    {errors.password && <p className="text-red-500 text-sm">{errors.password.message}</p>}
+                  <Link 
+                      href="/auth/forgot-password" 
+                      className="absolute right-0 top-0 text-sm text-blue-500 hover:underline mt-1"
+                  >
+                      ¿Olvidaste tu contraseña?
+                  </Link>
               </div>
                 <Button type="submit" disabled={loading} className="w-full flex items-center justify-center space-x-2">
                   {loading ? (
