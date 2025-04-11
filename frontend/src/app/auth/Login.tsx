@@ -107,7 +107,7 @@ export default function Login() {
                   <Input type="password" {...register('password')} />
                     {errors.password && <p className="text-red-500 text-sm">{errors.password.message}</p>}
                   <Link 
-                      href="/auth/forgot-password" 
+                      href="/auth/recover-password" 
                       className="absolute right-0 top-0 text-sm text-blue-500 hover:underline mt-1"
                   >
                       ¿Olvidaste tu contraseña?
