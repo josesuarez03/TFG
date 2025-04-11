@@ -16,7 +16,6 @@ import API from '@/services/api';
 
 const completeProfileSchema = z.object({
     fecha_nacimiento: z.string().min(1, { message: 'La fecha de nacimiento es obligatoria' }),
-    sexo: z.string().min(1, { message: 'El sexo es obligatorio' }),
     telefono: z.string().min(1, { message: 'El teléfono es obligatorio' })
         .regex(/^\d{10}$/, { message: 'El teléfono debe tener 10 dígitos' }),
     direccion: z.string().min(1, { message: 'La dirección es obligatoria' }),
