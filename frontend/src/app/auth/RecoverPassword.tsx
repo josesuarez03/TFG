@@ -19,6 +19,7 @@ const requestResetSchema = z.object({
 
 // Esquema para restablecer la contraseña
 const resetPasswordSchema = z.object({
+  code: z.string().min(1, { message: 'El código de verificación es obligatorio' }),
   password: z.string()
     .min(8, { message: 'La contraseña debe tener al menos 8 caracteres' })
     .regex(/[A-Z]/, { message: 'Debe contener al menos una letra mayúscula' })
@@ -37,8 +38,8 @@ type ResetPasswordInputs = z.infer<typeof resetPasswordSchema>;
 
 export default function RecoverPassword() {
   const router = useRouter();
-  const { token } = router.query;
-  const [mode, setMode] = useState<'request' | 'reset'>(token ? 'reset' : 'request');
+  const { email, code, verified } = router.query;
+  const [mode, setMode] = useState<'request' | 'reset'>(verified === 'true' ? 'reset' : 'request');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const { error, handleApiError, clearError } = useApiError();
@@ -51,14 +52,18 @@ export default function RecoverPassword() {
   // Formulario para restablecer contraseña
   const resetForm = useForm<ResetPasswordInputs>({
     resolver: zodResolver(resetPasswordSchema),
+    defaultValues: {
+      code: Array.isArray(code) ? code[0] : code || '',
+    }
   });
 
-  // Detectar token en la URL
+  // Detectar email y código en la URL
   useEffect(() => {
-    if (token) {
+    if (email && code && verified === 'true') {
       setMode('reset');
+      resetForm.setValue('code', Array.isArray(code) ? code[0] : code || '');
     }
-  }, [token]);
+  }, [email, code, verified, resetForm]);
 
   // Manejar solicitud de recuperación
   const onRequestSubmit = async (data: RequestResetInputs) => {
@@ -67,12 +72,15 @@ export default function RecoverPassword() {
     setSuccessMessage(null);
 
     try {
-      await API.post('password-reset-request/', {
+      await API.post('password/reset/request/', {
         email: data.email
       });
 
-      setSuccessMessage('Te hemos enviado un correo con instrucciones para restablecer tu contraseña');
-      requestForm.reset();
+      // En lugar de mostrar un mensaje, redirigir directamente a VerifyCode
+      router.push({
+        pathname: '/auth/verify-code',
+        query: { email: data.email }
+      });
     } catch (err) {
       handleApiError(err);
     } finally {
@@ -82,8 +90,8 @@ export default function RecoverPassword() {
 
   // Manejar restablecimiento de contraseña
   const onResetSubmit = async (data: ResetPasswordInputs) => {
-    if (!token) {
-      handleApiError(new Error('Token inválido o expirado'));
+    if (!email || !code) {
+      handleApiError(new Error('Información de verificación inválida o expirada'));
       return;
     }
 
@@ -92,9 +100,11 @@ export default function RecoverPassword() {
     setSuccessMessage(null);
 
     try {
-      await API.post('password-reset-confirm/', {
-        token: token,
-        password: data.password
+      // Actualizar para usar la ruta correcta de la API y el formato correcto
+      await API.post('password/reset/verify/', {
+        email: Array.isArray(email) ? email[0] : email,
+        code: data.code,
+        new_password: data.password
       });
 
       setSuccessMessage('Contraseña restablecida con éxito');
@@ -149,7 +159,7 @@ export default function RecoverPassword() {
             className="w-full" 
             disabled={isSubmitting}
           >
-            {isSubmitting ? 'Enviando...' : 'Enviar Correo de Recuperación'}
+            {isSubmitting ? 'Enviando...' : 'Enviar Código de Recuperación'}
           </Button>
 
           <p className="text-center text-sm mt-4">
@@ -168,6 +178,11 @@ export default function RecoverPassword() {
       ) : (
         // Formulario de restablecimiento
         <form onSubmit={resetForm.handleSubmit(onResetSubmit)} className="space-y-4">
+          <input 
+            type="hidden" 
+            {...resetForm.register('code')} 
+          />
+
           <div>
             <Label htmlFor="password">Nueva Contraseña</Label>
             <Input 
