@@ -367,7 +367,7 @@ class PasswordResetRequestView(APIView):
                 
                 # Enviar correo con el código de verificación
                 subject = 'Código de verificación para restablecer tu contraseña'
-                html_message = render_to_string('password_reset_email.html', {
+                html_message = render_to_string('password_reset.html', {
                     'user': user,
                     'code': verification_code,
                     'valid_time': '15 minutos'
