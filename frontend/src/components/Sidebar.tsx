@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import Link from "next/link";
 import { Button } from "./ui/button";
 import { 
@@ -9,22 +9,29 @@ import {
   TbUserCircle, 
   TbChevronLeft, 
   TbChevronRight,
-  TbStethoscope
+  TbStethoscope,
+  TbUserPlus,
+  TbClipboardList
 } from "react-icons/tb";
 import { useAuth } from "@/hooks/useAuth";
 import { useRouter } from "next/router";
+import { ROUTES, NAVIGATION_ITEMS } from "@/routes/routePaths";
+
+// Mapa de iconos para las rutas
+const iconMap: Record<string, React.ReactNode> = {
+  'HomeIcon': <TbHome />,
+  'UserIcon': <TbUserCircle />,
+  'ChatBubbleOvalLeftIcon': <TbMessageCircle />,
+  'ClipboardDocumentListIcon': <TbReportMedical />,
+  'UserGroupIcon': <TbUserPlus />,
+  'DocumentChartBarIcon': <TbClipboardList />,
+  'StethoscopeIcon': <TbStethoscope />
+};
 
 export default function Sidebar() {
-    const [isExpanded, setIsExpanded] = useState(false);
-    const { user, logout } = useAuth();
+    const [isExpanded, setIsExpanded] = useState(true);
+    const { user, logout, isAuthenticated } = useAuth();
     const router = useRouter();
-    
-    // Si no hay usuario autenticado, redirecciona al login
-    useEffect(() => {
-        if (!user) {
-            router.push("/auth/login");
-        }
-    }, [user, router]);
 
     const toggleSidebar = () => {
         setIsExpanded(!isExpanded);
@@ -32,7 +39,6 @@ export default function Sidebar() {
 
     const handleLogout = () => {
         logout();
-        router.push("/auth/login");
     };
 
     const getFullName = () => {
@@ -57,27 +63,17 @@ export default function Sidebar() {
         return user.email || "Usuario";
     };
 
-    // Elementos de menú comunes para todos los usuarios
-    const menuItems = [
-        { name: "Home", icon: <TbHome />, link: "/" },
-        { name: "Messages", icon: <TbMessageCircle />, link: "/messages" },
-        { name: "Medical Data", icon: <TbReportMedical />, link: "/medical-data" },
-    ];
-
-    // Elemento de menú exclusivo para médicos
-    const doctorMenuItem = { 
-        name: "Doctor Portal", 
-        icon: <TbStethoscope />, 
-        link: "/doctor-portal" 
+    const getIcon = (iconName: string) => {
+        return iconMap[iconName] || <TbHome />;
     };
 
-    // Si no hay usuario autenticado, no renderizamos el sidebar
-    if (!user) {
+    // Si no hay usuario autenticado o está cargando, no renderizamos el sidebar
+    if (!isAuthenticated) {
         return null;
     }
 
     // Verificar si el usuario es médico
-    const isDoctor = user.tipo === 'doctor';
+    const isDoctor = user?.tipo === 'doctor';
 
     return (
         <div
@@ -106,37 +102,43 @@ export default function Sidebar() {
                             <div className="ml-2">
                                 <span className="text-sm font-medium block">{getFullName()}</span>
                                 {isDoctor && <span className="text-xs text-blue-300">Doctor</span>}
+                                {!isDoctor && <span className="text-xs text-green-300">Paciente</span>}
                             </div>
                         )}
                     </div>
                 </div>
 
-                {/* Menú */}
+                {/* Menú principal */}
                 <nav className="mt-4 space-y-2">
-                    {menuItems.map((item, index) => (
+                    {NAVIGATION_ITEMS.main.map((item, index) => (
                         <Link
                             key={index}
-                            href={item.link}
+                            href={item.path}
                             className={`flex items-center space-x-4 p-3 hover:bg-gray-700 rounded-md mx-2 ${
-                                router.pathname === item.link ? "bg-gray-700" : ""
+                                router.pathname === item.path ? "bg-gray-700" : ""
                             }`}
                         >
-                            <span className="text-xl">{item.icon}</span>
+                            <span className="text-xl">{getIcon(item.icon)}</span>
                             {isExpanded && <span className="text-sm">{item.name}</span>}
                         </Link>
                     ))}
 
-                    {/* Opción exclusiva para médicos */}
+                    {/* Elementos específicos de doctor */}
                     {isDoctor && (
-                        <Link
-                            href={doctorMenuItem.link}
-                            className={`flex items-center space-x-4 p-3 hover:bg-gray-700 rounded-md mx-2 ${
-                                router.pathname === doctorMenuItem.link ? "bg-gray-700" : ""
-                            } ${isExpanded ? "bg-blue-900/40 hover:bg-blue-800/50" : ""}`}
-                        >
-                            <span className="text-xl text-blue-300">{doctorMenuItem.icon}</span>
-                            {isExpanded && <span className="text-sm font-medium text-blue-300">{doctorMenuItem.name}</span>}
-                        </Link>
+                        <div className="pt-2 mt-2 border-t border-gray-700">
+                            {NAVIGATION_ITEMS.doctor.map((item, index) => (
+                                <Link
+                                    key={`doctor-${index}`}
+                                    href={item.path}
+                                    className={`flex items-center space-x-4 p-3 hover:bg-gray-700 rounded-md mx-2 ${
+                                        router.pathname === item.path ? "bg-gray-700" : ""
+                                    } ${isExpanded ? "bg-blue-900/30 hover:bg-blue-800/40" : ""}`}
+                                >
+                                    <span className="text-xl text-blue-300">{getIcon(item.icon)}</span>
+                                    {isExpanded && <span className="text-sm font-medium text-blue-300">{item.name}</span>}
+                                </Link>
+                            ))}
+                        </div>
                     )}
                 </nav>
             </div>
@@ -144,13 +146,13 @@ export default function Sidebar() {
             {/* Footer con botón de perfil y logout */}
             <div className="mt-auto mb-4 space-y-2">
                 <Link 
-                    href="/profile"
+                    href={ROUTES.PROTECTED.PROFILE}
                     className={`flex items-center space-x-4 p-3 hover:bg-gray-700 rounded-md mx-2 ${
-                        router.pathname.startsWith("/profile") ? "bg-gray-700" : ""
+                        router.pathname === ROUTES.PROTECTED.PROFILE ? "bg-gray-700" : ""
                     }`}
                 >
                     <span className="text-xl"><TbUserCircle /></span>
-                    {isExpanded && <span className="text-sm">Profile</span>}
+                    {isExpanded && <span className="text-sm">Perfil</span>}
                 </Link>
                 
                 <Button
@@ -160,7 +162,7 @@ export default function Sidebar() {
                     onClick={handleLogout}
                 >
                     <span className="text-xl"><TbLogout /></span>
-                    {isExpanded && <span className="text-sm">Logout</span>}
+                    {isExpanded && <span className="text-sm">Cerrar Sesión</span>}
                 </Button>
             </div>
         </div>
