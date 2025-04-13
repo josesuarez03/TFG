@@ -4,6 +4,7 @@ import { jwtDecode } from "jwt-decode";
 import { useRouter } from "next/router";
 import { LoginResponse } from "@/types/auth";
 import { UserProfile } from "@/types/user";
+import { syncAuthState, updateAuthCookies, clearAuthCookies } from "@/utils/authSync";
 
 type User = UserProfile;
 
@@ -43,6 +44,9 @@ export const useAuth = () => {
 
             localStorage.setItem("access_token", access);
             localStorage.setItem("refresh_token", refresh);
+            
+            // Update cookies for middleware
+            updateAuthCookies(access);
 
             const decodedToken = decodeToken(access);
             handleRedirection(decodedToken?.is_profile_completed);
@@ -70,6 +74,9 @@ export const useAuth = () => {
 
             localStorage.setItem("access_token", access);
             localStorage.setItem("refresh_token", refresh);
+            
+            // Update cookies for middleware
+            updateAuthCookies(access);
 
             const decodedToken = decodeToken(access);
             handleRedirection(decodedToken?.is_profile_completed);
@@ -86,6 +93,10 @@ export const useAuth = () => {
     const logout = useCallback((): void => {
         localStorage.removeItem("access_token");
         localStorage.removeItem("refresh_token");
+        
+        // Clear cookies for middleware
+        clearAuthCookies();
+        
         setUser(null);
         router.push("/auth/login");
     }, [router]);
@@ -101,14 +112,26 @@ export const useAuth = () => {
         }
     }, [logout]);
 
-    // Verificar si el usuario está autenticado al cargar el hook
+    // Verify auth state and sync with cookies on mount and when token changes
     useEffect(() => {
+        syncAuthState();
+        
         const token = localStorage.getItem("access_token");
         if (token) {
             fetchUser().catch(() => logout());
         } else {
             setLoading(false);
         }
+        
+        // Set up event listener for storage changes
+        const handleStorageChange = () => {
+            syncAuthState();
+        };
+        
+        window.addEventListener('storage', handleStorageChange);
+        return () => {
+            window.removeEventListener('storage', handleStorageChange);
+        };
     }, [fetchUser, logout]);
 
     return { user, login, loginWithGoogle, logout, loading, error };
