@@ -10,6 +10,7 @@ import API from '@/services/api';
 import { useRouter } from 'next/router';
 import { useApiError } from '@/hooks/useApiError';
 import { TbLock, TbLockOpen, TbDeviceFloppy, TbArrowLeft } from "react-icons/tb";
+import { ROUTES } from '@/routes/routePaths';
 
 const changePasswordSchema = z.object({
   currentPassword: z.string().min(1, { message: 'La contraseña actual es obligatoria' }),
@@ -53,7 +54,7 @@ export default function ChangePassword() {
       
       // Redirigir al perfil después de 2 segundos
       setTimeout(() => {
-        router.push('/profile');
+        router.push(ROUTES.PROTECTED.PROFILE);
       }, 2000);
     } catch (err) {
       handleApiError(err);

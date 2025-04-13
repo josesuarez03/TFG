@@ -20,6 +20,7 @@ import {
   TbAlertTriangle,
   TbKey
 } from "react-icons/tb";
+import { ROUTES } from '@/routes/routePaths';
 
 // Esquema para solicitar recuperación (email)
 const requestResetSchema = z.object({
@@ -89,7 +90,7 @@ export default function RecoverPassword() {
 
       // En lugar de mostrar un mensaje, redirigir directamente a VerifyCode
       router.push({
-        pathname: '/auth/verify-code',
+        pathname: ROUTES.PUBLIC.VERIFY_CODE,
         query: { email: data.email }
       });
     } catch (err) {
@@ -122,7 +123,7 @@ export default function RecoverPassword() {
       
       // Redirigir al login después de 2 segundos
       setTimeout(() => {
-        router.push('/auth/login');
+        router.push(ROUTES.PUBLIC.LOGIN);
       }, 2000);
     } catch (err) {
       handleApiError(err);

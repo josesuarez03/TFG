@@ -5,6 +5,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import API from '@/services/api';
 import { useApiError } from '@/hooks/useApiError';
+import { ROUTES } from '@/routes/routePaths';
 
 export default function VerifyCode() {
   const router = useRouter();
@@ -114,7 +115,7 @@ export default function VerifyCode() {
 
       // Redirigir directamente a la página de login con un mensaje
       router.push({
-        pathname: '/auth/login',
+        pathname: ROUTES.PUBLIC.LOGIN,
         query: { 
           message: 'Contraseña restablecida correctamente. Ahora puedes iniciar sesión.'
         }

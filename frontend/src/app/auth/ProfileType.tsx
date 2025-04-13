@@ -5,6 +5,7 @@ import { useRouter } from 'next/router';
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { TbUser, TbStethoscope } from "react-icons/tb";
+import { ROUTES } from '@/routes/routePaths';
 
 export default function ProfileType() {
     const router = useRouter();
@@ -18,7 +19,7 @@ export default function ProfileType() {
     const handleCreateAccount = () => {
         if (selectedType) {
             router.push({
-                pathname: '/auth/register',
+                pathname: ROUTES.PUBLIC.REGISTER,
                 query: { type: selectedType }
             });
         }
@@ -105,7 +106,7 @@ export default function ProfileType() {
                 
                 <p>
                     ¿Ya tienes una cuenta?{" "}
-                    <Link href="/auth/login" className="text-green-600 hover:underline font-medium">
+                    <Link href={ROUTES.PUBLIC.LOGIN} className="text-green-600 hover:underline font-medium">
                         Inicia sesión aquí
                     </Link>
                 </p>

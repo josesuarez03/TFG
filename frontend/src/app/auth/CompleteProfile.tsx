@@ -26,6 +26,7 @@ import {
     TbCheck, 
     TbLoader 
 } from "react-icons/tb";
+import { ROUTES } from '@/routes/routePaths';
 
 const completeProfileSchema = z.object({
     fecha_nacimiento: z.string().min(1, { message: 'La fecha de nacimiento es obligatoria' }),
@@ -89,7 +90,7 @@ export default function CompleteProfile() {
 
     useEffect(() => {
         if (user?.is_profile_completed) {
-            router.push('/dashboard');
+            router.push(ROUTES.PROTECTED.DASHBOARD);
         }
     }, [user, router]);
 
@@ -128,7 +129,7 @@ export default function CompleteProfile() {
                     <AlertDescription>
                         Debes iniciar sesión para completar tu perfil.
                         <Button
-                            onClick={() => router.push('/auth/login')}
+                            onClick={() => router.push({ pathname: ROUTES.PUBLIC.LOGIN })}
                             className="ml-4"
                         >
                             Iniciar Sesión

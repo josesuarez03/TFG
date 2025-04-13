@@ -5,6 +5,7 @@ import { Card, CardHeader, CardTitle, CardContent, CardFooter } from "@/componen
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { TbEdit, TbUser, TbPhone, TbCalendar, TbMapPin, TbBriefcase } from "react-icons/tb";
+import { ROUTES } from '@/routes/routePaths';
 
 export default function UserProfile() {
     const router = useRouter();
@@ -13,7 +14,7 @@ export default function UserProfile() {
     useEffect(() => {
         // Redirigir si no hay usuario autenticado
         if (!authLoading && !user) {
-            router.push('/auth/login');
+            router.push(ROUTES.PUBLIC.LOGIN);
         }
     }, [user, authLoading, router]);
 
@@ -33,7 +34,7 @@ export default function UserProfile() {
                     <AlertDescription>
                         Debes iniciar sesión para ver tu perfil.
                         <Button
-                            onClick={() => router.push('/auth/login')}
+                            onClick={() => router.push( ROUTES.PUBLIC.LOGIN)}
                             className="ml-4"
                         >
                             Iniciar Sesión
@@ -45,7 +46,7 @@ export default function UserProfile() {
     }
 
     const handleEditProfile = () => {
-        router.push('/profile/edit');
+        router.push(ROUTES.PROTECTED.PROFILE_EDIT);
     };
 
     // Función para formatear la fecha
@@ -187,13 +188,13 @@ export default function UserProfile() {
                     </p>
                     <div className="flex flex-col sm:flex-row items-center space-y-4 sm:space-y-0 sm:space-x-4">
                         <Button 
-                            onClick={() => router.push('/profile/change-password')} 
+                            onClick={() => router.push(ROUTES.PROTECTED.PROFILE_EDIT)} 
                             className="w-full sm:w-auto"
                         >
                             Cambiar Contraseña
                         </Button>
                         <Button 
-                            onClick={() => router.push('/profile/delete-account')} 
+                            onClick={() => router.push(ROUTES.PROTECTED.PROFILE_DELETE_ACCOUNT)} 
                             variant="destructive" 
                             className="w-full sm:w-auto"
                         >

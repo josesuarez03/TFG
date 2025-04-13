@@ -26,6 +26,7 @@ import {
   TbUserCircle,
   TbCheckbox
 } from "react-icons/tb";
+import { ROUTES } from '@/routes/routePaths';
 
 const registerSchema = z.object({
     email: z.string()
@@ -255,7 +256,7 @@ export default function Register() {
           <CardFooter className="text-center">
                 <p className="flex items-center justify-center">
                     ¿Ya tienes cuenta? 
-                    <Link href="/auth/login" className="text-blue-500 hover:underline ml-2 flex items-center">
+                    <Link href={ROUTES.PUBLIC.LOGIN} className="text-blue-500 hover:underline ml-2 flex items-center">
                         <TbLogin className="w-4 h-4 mr-1" />
                         <span>Inicia sesión</span>
                     </Link>

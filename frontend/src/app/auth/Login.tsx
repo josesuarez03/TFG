@@ -1,6 +1,7 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
+import { useRouter } from 'next/router';
 import { useAuth } from '@/hooks/useAuth';
 import { GoogleOAuthProvider, GoogleLogin, CredentialResponse } from '@react-oauth/google';
 import { Card, CardHeader, CardTitle, CardContent, CardFooter } from "@/components/ui/card";
@@ -12,7 +13,8 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { TbMail, TbLock, TbUser, TbBrandGoogle } from 'react-icons/tb';
+import { TbMail, TbLock, TbUser, TbBrandGoogle, TbLoader } from 'react-icons/tb';
+import { ROUTES } from '@/routes/routePaths';
 
 const loginSchema = z.object({
   email: z.string()
@@ -33,10 +35,22 @@ const loginSchema = z.object({
 type LoginFormInputs = z.infer<typeof loginSchema>;
 
 export default function Login() {
-    const { login, loginWithGoogle, error: authError, loading } = useAuth();
+    const router = useRouter();
+    const { login, loginWithGoogle, error: authError, loading, isAuthenticated, user } = useAuth();
     const { register, handleSubmit, formState: { errors } } = useForm<LoginFormInputs>({
         resolver: zodResolver(loginSchema)
     });
+
+    // Redireccionar si el usuario ya está autenticado
+    useEffect(() => {
+        if (isAuthenticated && user) {
+            if (!user.is_profile_completed) {
+                router.push(ROUTES.PROTECTED.PROFILE_COMPLETE);
+            } else {
+                router.push(ROUTES.PROTECTED.DASHBOARD);
+            }
+        }
+    }, [isAuthenticated, user, router]);
 
     // Manejo del formulario de inicio de sesión
     const onSubmit = async (data: LoginFormInputs) => {
@@ -106,7 +120,7 @@ export default function Login() {
                   <Input type="password" {...register('password')} />
                     {errors.password && <p className="text-red-500 text-sm">{errors.password.message}</p>}
                   <Link 
-                      href="/auth/recover-password" 
+                      href={ROUTES.PUBLIC.RECOVER_PASSWORD} 
                       className="absolute right-0 top-0 text-sm text-blue-500 hover:underline mt-1"
                   >
                       ¿Olvidaste tu contraseña?
@@ -115,7 +129,7 @@ export default function Login() {
                 <Button type="submit" disabled={loading} className="w-full flex items-center justify-center space-x-2">
                   {loading ? (
                     <div className="flex items-center justify-center">
-                      <svg className="animate-spin h-5 w-5 mr-3 text-white" viewBox="0 0 24 24"></svg>
+                      <TbLoader className="animate-spin h-5 w-5 mr-3 text-white" />
                       <span className="text-white">Cargando...</span>
                     </div>
                   ) : (
@@ -151,7 +165,7 @@ export default function Login() {
             </div>
           </CardContent>
           <CardFooter className="text-center">
-              <p>¿No tienes cuenta? <Link href="/auth/register" className="text-blue-500 hover:underline">Regístrate</Link></p>
+              <p>¿No tienes cuenta? <Link href={ROUTES.PUBLIC.REGISTER} className="text-blue-500 hover:underline">Regístrate</Link></p>
           </CardFooter>
         </Card>
     );

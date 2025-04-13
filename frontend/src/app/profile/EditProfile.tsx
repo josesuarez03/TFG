@@ -25,6 +25,7 @@ import {
   TbCertificate, 
   TbAlertTriangle
 } from "react-icons/tb";
+import { ROUTES } from '@/routes/routePaths';
 
 const profileSchema = z.object({
     first_name: z.string()
@@ -97,7 +98,7 @@ export default function EditProfile(){
     useEffect(() => {
         // Redirigir si no hay usuario autenticado
         if (!authLoading && !user) {
-            router.push('/auth/login');
+            router.push(ROUTES.PUBLIC.LOGIN);
         }
     }, [user, authLoading, router]);
 
@@ -111,7 +112,7 @@ export default function EditProfile(){
             setSuccess(true);
             // Mostrar mensaje de éxito por un momento antes de redirigir
             setTimeout(() => {
-                router.push('/profile');
+                router.push(ROUTES.PROTECTED.PROFILE);
             }, 1500);
         } catch (err: unknown) {
             setError('Error al actualizar el perfil. Inténtalo de nuevo.');
@@ -122,7 +123,7 @@ export default function EditProfile(){
     };
 
     const handleCancel = () => {
-        router.push('/profile');
+        router.push(ROUTES.PROTECTED.PROFILE);
     };
 
     if (authLoading) {
@@ -141,7 +142,7 @@ export default function EditProfile(){
                     <AlertDescription>
                         Debes iniciar sesión para editar tu perfil.
                         <Button
-                            onClick={() => router.push('/auth/login')}
+                            onClick={() => router.push(ROUTES.PUBLIC.LOGIN)}
                             className="ml-4"
                         >
                             Iniciar Sesión
