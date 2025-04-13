@@ -4,7 +4,7 @@ import Image from 'next/image';
 import { useRouter } from 'next/router';
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { BsPersonFill, BsHeartPulseFill } from "react-icons/bs";
+import { TbUser, TbStethoscope } from "react-icons/tb";
 
 export default function ProfileType() {
     const router = useRouter();
@@ -50,7 +50,7 @@ export default function ProfileType() {
                 >
                     <div className="flex justify-between items-start mb-6">
                         <div className="p-2 rounded-full bg-gray-100">
-                            <BsPersonFill className="w-6 h-6 text-blue-500" />
+                            <TbUser className="w-6 h-6 text-blue-500" />
                         </div>
                         <div className={`w-6 h-6 rounded-full border-2 ${
                             selectedType === 'patient' ? 'border-blue-500 bg-blue-500/20' : 'border-gray-300'
@@ -77,7 +77,7 @@ export default function ProfileType() {
                 >
                     <div className="flex justify-between items-start mb-6">
                         <div className="p-2 rounded-full bg-gray-100">
-                            <BsHeartPulseFill className="w-6 h-6 text-red-500" />
+                            <TbStethoscope className="w-6 h-6 text-red-500" />
                         </div>
                         <div className={`w-6 h-6 rounded-full border-2 ${
                             selectedType === 'doctor' ? 'border-blue-500 bg-blue-500/20' : 'border-gray-300'

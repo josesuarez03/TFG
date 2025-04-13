@@ -13,7 +13,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { FcGoogle } from "react-icons/fc";
+import { TbBrandGoogle } from "react-icons/tb";
 import API from '@/services/api';
 
 
@@ -157,7 +157,7 @@ export default function Register() {
                 onClick={triggerGoogleLogin} 
                 className="w-full flex items-center justify-center space-x-2 bg-white hover:bg-gray-100 text-gray-800 border border-gray-300 mb-4"
                 >
-                <FcGoogle className="w-5 h-5" />
+                <TbBrandGoogle className="w-5 h-5" />
                 <span>Registrarse con Google</span>
             </Button>
                       

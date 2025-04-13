@@ -12,8 +12,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { FcGoogle } from "react-icons/fc";
-import { MdLock, MdEmail, MdPerson } from "react-icons/md";
+import { TbMail, TbLock, TbUser, TbBrandGoogle } from 'react-icons/tb';
 
 const loginSchema = z.object({
   email: z.string()
@@ -93,7 +92,7 @@ export default function Login() {
             <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
               <div>
                 <Label>
-                  <MdEmail className="w-5 h-5 inline-block mr-2 text-gray-500" />
+                  <TbMail className="w-5 h-5 inline-block mr-2 text-gray-500" />
                   Email
                 </Label>
                 <Input type="email" {...register('email')} />
@@ -101,7 +100,7 @@ export default function Login() {
               </div>
               <div className="relative">
                   <Label>
-                      <MdLock className="w-5 h-5 inline-block mr-2 text-gray-500" />
+                      <TbLock className="w-5 h-5 inline-block mr-2 text-gray-500" />
                       Contraseña
                   </Label>
                   <Input type="password" {...register('password')} />
@@ -121,7 +120,7 @@ export default function Login() {
                     </div>
                   ) : (
                     <>
-                      <MdPerson className="w-5 h-5 text-white" />
+                      <TbUser className="w-5 h-5 text-white" />
                       <span>Ingresar</span>
                     </>
                   )}
@@ -134,7 +133,7 @@ export default function Login() {
               onClick={triggerGoogleLogin} 
               className="w-full flex items-center justify-center space-x-2 bg-white hover:bg-gray-100 text-gray-800 border border-gray-300"
             >
-              <FcGoogle className="w-5 h-5" />
+              <TbBrandGoogle className="w-5 h-5" />
               <span>Iniciar sesión con Google</span>
             </Button>
             

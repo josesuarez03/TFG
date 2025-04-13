@@ -4,7 +4,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { Card, CardHeader, CardTitle, CardContent, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { MdEdit, MdPerson, MdPhone, MdCalendarToday, MdLocationOn, MdWork } from "react-icons/md";
+import { TbEdit, TbUser, TbPhone, TbCalendar, TbMapPin, TbBriefcase } from "react-icons/tb";
 
 export default function UserProfile() {
     const router = useRouter();
@@ -65,7 +65,7 @@ export default function UserProfile() {
                 <CardHeader className="flex flex-col sm:flex-row items-center justify-between pb-6 border-b">
                     <div className="flex flex-col sm:flex-row items-center">
                         <div className="flex items-center justify-center w-12 h-12 rounded-full bg-blue-100 text-blue-800 text-2xl mr-4">
-                            <MdPerson />
+                            <TbUser />
                         </div>
                         <div className="text-center sm:text-left">
                             <CardTitle className="text-2xl font-bold">
@@ -81,7 +81,7 @@ export default function UserProfile() {
                         onClick={handleEditProfile} 
                         className="mt-4 sm:mt-0 flex items-center"
                     >
-                        <MdEdit className="mr-2" />
+                        <TbEdit className="mr-2" />
                         Editar Perfil
                     </Button>
                 </CardHeader>
@@ -93,7 +93,7 @@ export default function UserProfile() {
                             
                             <div className="space-y-4">
                                 <div className="flex items-start">
-                                    <MdCalendarToday className="w-5 h-5 mr-3 mt-1 text-gray-500" />
+                                    <TbCalendar className="w-5 h-5 mr-3 mt-1 text-gray-500" />
                                     <div>
                                         <p className="text-sm text-gray-500">Fecha de Nacimiento</p>
                                         <p>{formatDate(user.fecha_nacimiento)}</p>
@@ -101,7 +101,7 @@ export default function UserProfile() {
                                 </div>
                                 
                                 <div className="flex items-start">
-                                    <MdPerson className="w-5 h-5 mr-3 mt-1 text-gray-500" />
+                                    <TbUser className="w-5 h-5 mr-3 mt-1 text-gray-500" />
                                     <div>
                                         <p className="text-sm text-gray-500">Género</p>
                                         <p>{user.genero ? user.genero.charAt(0).toUpperCase() + user.genero.slice(1) : 'No especificado'}</p>
@@ -109,7 +109,7 @@ export default function UserProfile() {
                                 </div>
                                 
                                 <div className="flex items-start">
-                                    <MdPhone className="w-5 h-5 mr-3 mt-1 text-gray-500" />
+                                    <TbPhone className="w-5 h-5 mr-3 mt-1 text-gray-500" />
                                     <div>
                                         <p className="text-sm text-gray-500">Teléfono</p>
                                         <p>{user.telefono || 'No especificado'}</p>
@@ -117,7 +117,7 @@ export default function UserProfile() {
                                 </div>
                                 
                                 <div className="flex items-start">
-                                    <MdLocationOn className="w-5 h-5 mr-3 mt-1 text-gray-500" />
+                                    <TbMapPin className="w-5 h-5 mr-3 mt-1 text-gray-500" />
                                     <div>
                                         <p className="text-sm text-gray-500">Dirección</p>
                                         <p>{user.direccion || 'No especificada'}</p>
@@ -135,7 +135,7 @@ export default function UserProfile() {
                             {user.tipo === 'patient' && user.patient && (
                                 <div className="space-y-4">
                                     <div className="flex items-start">
-                                        <MdWork className="w-5 h-5 mr-3 mt-1 text-gray-500" />
+                                        <TbBriefcase className="w-5 h-5 mr-3 mt-1 text-gray-500" />
                                         <div>
                                             <p className="text-sm text-gray-500">Ocupación</p>
                                             <p>{user.patient.ocupacion || 'No especificada'}</p>
