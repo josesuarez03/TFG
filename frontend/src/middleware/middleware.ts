@@ -1,36 +1,7 @@
+// src/middleware.ts
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
-
-// Define route groups
-const ROUTES = {
-  // Public routes
-  PUBLIC: {
-    LOGIN: '/auth/login',
-    REGISTER: '/auth/register',
-    PROFILE_TYPE: '/auth/profile-type',
-    RECOVER_PASSWORD: '/auth/recover-password',
-    VERIFY_CODE: '/auth/verify-code',
-  },
-  
-  // Protected routes
-  PROTECTED: {
-    DASHBOARD: '/dashboard',
-    HOME: '/home',
-    PROFILE: '/profile',
-    PROFILE_COMPLETE: '/profile/complete',
-    PROFILE_EDIT: '/profile/edit',
-    PROFILE_CHANGE_PASSWORD: '/profile/change-password',
-    PROFILE_DELETE_ACCOUNT: '/profile/delete-account',
-    CHAT: '/chat',
-    MEDICAL_DATA: '/medical-data',
-  },
-  
-  // Doctor-specific routes
-  DOCTOR: {
-    PATIENTS: '/doctor/patients',
-    MEDICAL_DATA: '/doctor/medical-data',
-  }
-};
+import { ROUTES } from '@/routes/routePaths';
 
 // Check if a path starts with any of the paths in the array
 const pathStartsWith = (path: string, routeMap: Record<string, string>): boolean => {
@@ -65,15 +36,17 @@ export function middleware(request: NextRequest) {
       return NextResponse.redirect(new URL(ROUTES.PROTECTED.PROFILE_COMPLETE, request.url));
     }
     
-    // Otherwise, continue to root path which will show dashboard content
+    // Otherwise, redirect to dashboard
     return NextResponse.redirect(new URL(ROUTES.PROTECTED.DASHBOARD, request.url));
   }
   
   // Handle password recovery flow
-  if (pathStartsWith(pathname, ROUTES.PUBLIC) && 
-      (pathname === ROUTES.PUBLIC.RECOVER_PASSWORD || pathname === ROUTES.PUBLIC.VERIFY_CODE)) {
+  const isRecoverPasswordPath = pathname === ROUTES.PUBLIC.RECOVER_PASSWORD;
+  const isVerifyCodePath = pathname === ROUTES.PUBLIC.VERIFY_CODE;
+  
+  if (isRecoverPasswordPath || isVerifyCodePath) {
     // For recover-password, check if coming from login or already in flow
-    if (pathname === ROUTES.PUBLIC.RECOVER_PASSWORD && !recoveryInitiatedCookie) {
+    if (isRecoverPasswordPath && !recoveryInitiatedCookie) {
       // Check if the request includes a specific query parameter from login
       const fromLogin = request.nextUrl.searchParams.get('fromLogin');
       if (fromLogin !== 'true') {
@@ -83,7 +56,7 @@ export function middleware(request: NextRequest) {
     }
     
     // For verify-code, check if recover-password was completed
-    if (pathname === ROUTES.PUBLIC.VERIFY_CODE && !recoveryEmailSentCookie) {
+    if (isVerifyCodePath && !recoveryEmailSentCookie) {
       // If email not sent (recover-password not completed), redirect to recover-password
       return NextResponse.redirect(new URL(ROUTES.PUBLIC.RECOVER_PASSWORD, request.url));
     }
@@ -93,8 +66,8 @@ export function middleware(request: NextRequest) {
   }
   
   // User is not authenticated and trying to access protected route
-  if (!isAuthenticated && (pathStartsWith(pathname, ROUTES.PROTECTED) || 
-                          pathStartsWith(pathname, ROUTES.DOCTOR))) {
+  if (!isAuthenticated && 
+      (pathStartsWith(pathname, ROUTES.PROTECTED) || pathStartsWith(pathname, ROUTES.DOCTOR))) {
     const url = new URL(ROUTES.PUBLIC.LOGIN, request.url);
     url.searchParams.set('from', pathname);
     return NextResponse.redirect(url);

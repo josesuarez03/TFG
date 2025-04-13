@@ -1,4 +1,6 @@
 // src/utils/router.ts
+'use client';
+
 import { useRouter } from 'next/navigation';
 import { ROUTES } from '@/routes/routePaths';
 

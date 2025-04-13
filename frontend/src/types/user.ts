@@ -27,3 +27,11 @@ export interface UserProfile {
   last_login: string;
   is_active: boolean;
 }
+
+export interface RegisterData {
+  email: string;
+  password: string;
+  first_name: string;
+  last_name: string;
+  tipo: string;
+}
