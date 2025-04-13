@@ -16,6 +16,7 @@ import {
 import { useAuth } from "@/hooks/useAuth";
 import { useRouter } from "next/router";
 import { ROUTES, NAVIGATION_ITEMS } from "@/routes/routePaths";
+import ThemeToggle from "./theme-toggle"; // Importamos el componente ThemeToggle
 
 // Mapa de iconos para las rutas
 const iconMap: Record<string, React.ReactNode> = {
@@ -143,7 +144,7 @@ export default function Sidebar() {
                 </nav>
             </div>
 
-            {/* Footer con botón de perfil y logout */}
+            {/* Footer con botón de perfil, tema y logout */}
             <div className="mt-auto mb-4 space-y-2">
                 <Link 
                     href={ROUTES.PROTECTED.PROFILE}
@@ -154,6 +155,17 @@ export default function Sidebar() {
                     <span className="text-xl"><TbUserCircle /></span>
                     {isExpanded && <span className="text-sm">Perfil</span>}
                 </Link>
+                
+                {/* Componente de ThemeToggle */}
+                <div className={`flex items-center p-3 hover:bg-gray-700 rounded-md mx-2`}>
+                {isExpanded && (
+                    <div className="flex items-center p-3 hover:bg-gray-700 rounded-md mx-2">
+                        <div className="flex items-center justify-between w-full">
+                            <ThemeToggle />
+                        </div>
+                    </div>
+                )}
+                </div>
                 
                 <Button
                     variant="ghost"
