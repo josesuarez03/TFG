@@ -20,6 +20,7 @@ import API from '@/services/api';
 import { useRouter } from 'next/router';
 import { useAuth } from '@/hooks/useAuth';
 import { useApiError } from '@/hooks/useApiError';
+import { TbTrash, TbAlertTriangle, TbArrowLeft, TbLock, TbAlertCircle } from "react-icons/tb";
 
 // Esquema para validar contraseña
 const deleteAccountSchema = z.object({
@@ -69,17 +70,24 @@ export default function DeleteAccount() {
 
   return (
     <div className="max-w-md mx-auto mt-10 p-6 bg-white rounded-lg shadow-md">
-      <h1 className="text-2xl font-bold text-center mb-6">Eliminar Cuenta</h1>
+      <h1 className="text-2xl font-bold text-center mb-6 flex items-center justify-center">
+        <TbTrash className="w-6 h-6 mr-2 text-red-500" />
+        Eliminar Cuenta
+      </h1>
       
       <div className="space-y-4">
         <Alert className="bg-amber-50 border-amber-200">
+          <TbAlertTriangle className="w-5 h-5 inline-block mr-2 text-amber-500" />
           <AlertDescription className="text-amber-800">
             <strong>Advertencia:</strong> Esta acción eliminará permanentemente tu cuenta y todos los datos asociados.
           </AlertDescription>
         </Alert>
         
         <div className="space-y-2">
-          <h3 className="font-semibold">Consecuencias de eliminar tu cuenta:</h3>
+          <h3 className="font-semibold flex items-center">
+            <TbAlertCircle className="w-5 h-5 mr-2 text-gray-700" />
+            Consecuencias de eliminar tu cuenta:
+          </h3>
           <ul className="list-disc pl-5 space-y-1">
             <li>Todos tus datos personales serán eliminados</li>
             <li>Perderás acceso a tu historial médico</li>
@@ -92,13 +100,17 @@ export default function DeleteAccount() {
           <Button 
             variant="outline"
             onClick={() => router.back()}
+            className="flex items-center"
           >
+            <TbArrowLeft className="mr-2" />
             Cancelar
           </Button>
           <Button 
             variant="destructive"
             onClick={openConfirmDialog}
+            className="flex items-center"
           >
+            <TbTrash className="mr-2" />
             Eliminar Cuenta
           </Button>
         </div>
@@ -107,7 +119,10 @@ export default function DeleteAccount() {
       <AlertDialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>¿Estás seguro?</AlertDialogTitle>
+            <AlertDialogTitle className="flex items-center">
+              <TbAlertCircle className="w-5 h-5 mr-2 text-red-500" />
+              ¿Estás seguro?
+            </AlertDialogTitle>
             <AlertDialogDescription>
               Esta acción no se puede deshacer. Tu cuenta y todos tus datos serán eliminados permanentemente.
             </AlertDialogDescription>
@@ -122,7 +137,10 @@ export default function DeleteAccount() {
           <form onSubmit={handleSubmit(handleDelete)}>
             <div className="space-y-4 my-4">
               <div>
-                <Label htmlFor="password">Introduce tu contraseña para confirmar</Label>
+                <Label htmlFor="password" className="flex items-center">
+                  <TbLock className="w-5 h-5 mr-2 text-gray-500" />
+                  Introduce tu contraseña para confirmar
+                </Label>
                 <Input 
                   id="password"
                   type="password" 
@@ -135,7 +153,10 @@ export default function DeleteAccount() {
               </div>
               
               <div>
-                <Label htmlFor="confirmation">Escribe &quot;eliminar mi cuenta&quot; para confirmar</Label>
+                <Label htmlFor="confirmation" className="flex items-center">
+                  <TbAlertTriangle className="w-5 h-5 mr-2 text-gray-500" />
+                  Escribe &quot;eliminar mi cuenta&quot; para confirmar
+                </Label>
                 <Input 
                   id="confirmation"
                   type="text" 
@@ -149,14 +170,28 @@ export default function DeleteAccount() {
             </div>
             
             <AlertDialogFooter>
-              <AlertDialogCancel disabled={isSubmitting}>Cancelar</AlertDialogCancel>
+              <AlertDialogCancel disabled={isSubmitting} className="flex items-center">
+                <TbArrowLeft className="mr-2" />
+                Cancelar
+              </AlertDialogCancel>
               <AlertDialogAction asChild>
                 <Button 
                   type="submit" 
                   variant="destructive" 
                   disabled={isSubmitting}
+                  className="flex items-center"
                 >
-                  {isSubmitting ? 'Eliminando...' : 'Confirmar eliminación'}
+                  {isSubmitting ? (
+                    <>
+                      <svg className="animate-spin h-5 w-5 mr-3 text-white" viewBox="0 0 24 24"></svg>
+                      Eliminando...
+                    </>
+                  ) : (
+                    <>
+                      <TbTrash className="mr-2" />
+                      Confirmar eliminación
+                    </>
+                  )}
                 </Button>
               </AlertDialogAction>
             </AlertDialogFooter>

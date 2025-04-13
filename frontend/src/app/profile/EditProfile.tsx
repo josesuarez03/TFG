@@ -11,8 +11,20 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { MdArrowBack, MdSave, MdPerson } from "react-icons/md";
 import API from '@/services/api';
+import { 
+  TbArrowLeft, 
+  TbDeviceFloppy, 
+  TbUser, 
+  TbCalendar, 
+  TbPhone, 
+  TbHome, 
+  TbGenderMale, 
+  TbBriefcase, 
+  TbStethoscope, 
+  TbCertificate, 
+  TbAlertTriangle
+} from "react-icons/tb";
 
 const profileSchema = z.object({
     first_name: z.string()
@@ -152,12 +164,12 @@ export default function EditProfile(){
                             className="flex items-center"
                             aria-label="Volver al perfil"
                         >
-                            <MdArrowBack className="mr-2" />
+                            <TbArrowLeft className="mr-2" />
                             Volver
                         </Button>
                         {/* Icono del perfil */}
                         <div className="flex items-center justify-center w-12 h-12 rounded-full bg-blue-100 text-blue-800 text-2xl">
-                            <MdPerson />
+                            <TbUser />
                         </div>
                     </div>
                     {/* Título del encabezado */}
@@ -177,22 +189,34 @@ export default function EditProfile(){
                     <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                             <div>
-                                <Label>Nombre</Label>
+                                <Label className="flex items-center">
+                                    <TbUser className="w-5 h-5 mr-2 text-gray-500" />
+                                    Nombre
+                                </Label>
                                 <Input {...register('first_name')} />
                                 {errors.first_name && <p className="text-red-500 text-sm">{errors.first_name.message}</p>}
                             </div>
                             <div>
-                                <Label>Apellido</Label>
+                                <Label className="flex items-center">
+                                    <TbUser className="w-5 h-5 mr-2 text-gray-500" />
+                                    Apellido
+                                </Label>
                                 <Input {...register('last_name')} />
                                 {errors.last_name && <p className="text-red-500 text-sm">{errors.last_name.message}</p>}
                             </div>
                             <div>
-                                <Label>Fecha de Nacimiento</Label>
+                                <Label className="flex items-center">
+                                    <TbCalendar className="w-5 h-5 mr-2 text-gray-500" />
+                                    Fecha de Nacimiento
+                                </Label>
                                 <Input type="date" {...register('fecha_nacimiento')} />
                                 {errors.fecha_nacimiento && <p className="text-red-500 text-sm">{errors.fecha_nacimiento.message}</p>}
                             </div>
                             <div>
-                                <Label>Género</Label>
+                                <Label className="flex items-center">
+                                    <TbGenderMale className="w-5 h-5 mr-2 text-gray-500" />
+                                    Género
+                                </Label>
                                 <Controller
                                     name="genero"
                                     control={control}
@@ -213,12 +237,18 @@ export default function EditProfile(){
                                 {errors.genero && <p className="text-red-500 text-sm">{errors.genero.message}</p>}
                             </div>
                             <div>
-                                <Label>Teléfono</Label>
+                                <Label className="flex items-center">
+                                    <TbPhone className="w-5 h-5 mr-2 text-gray-500" />
+                                    Teléfono
+                                </Label>
                                 <Input {...register('telefono')} />
                                 {errors.telefono && <p className="text-red-500 text-sm">{errors.telefono.message}</p>}
                             </div>
                             <div>
-                                <Label>Dirección</Label>
+                                <Label className="flex items-center">
+                                    <TbHome className="w-5 h-5 mr-2 text-gray-500" />
+                                    Dirección
+                                </Label>
                                 <Input {...register('direccion')} />
                                 {errors.direccion && <p className="text-red-500 text-sm">{errors.direccion.message}</p>}
                             </div>
@@ -227,15 +257,24 @@ export default function EditProfile(){
                         {/* Campos adicionales según el tipo de usuario */}
                         {user.tipo === 'patient' && (
                             <div className="border-t pt-6 mt-6">
-                                <h3 className="text-lg font-semibold mb-4">Información Médica</h3>
+                                <h3 className="text-lg font-semibold mb-4 flex items-center">
+                                    <TbBriefcase className="w-5 h-5 mr-2 text-gray-700" />
+                                    Información Médica
+                                </h3>
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                     <div>
-                                        <Label>Ocupación</Label>
+                                        <Label className="flex items-center">
+                                            <TbBriefcase className="w-5 h-5 mr-2 text-gray-500" />
+                                            Ocupación
+                                        </Label>
                                         <Input {...register('ocupacion')} />
                                         {errors.ocupacion && <p className="text-red-500 text-sm">{errors.ocupacion?.message}</p>}
                                     </div>
                                     <div className="md:col-span-2">
-                                        <Label>Alergias (opcional)</Label>
+                                        <Label className="flex items-center">
+                                            <TbAlertTriangle className="w-5 h-5 mr-2 text-gray-500" />
+                                            Alergias (opcional)
+                                        </Label>
                                         <Textarea {...register('allergies')} rows={3} />
                                     </div>
                                 </div>
@@ -244,15 +283,24 @@ export default function EditProfile(){
 
                         {user.tipo === 'doctor' && (
                             <div className="border-t pt-6 mt-6">
-                                <h3 className="text-lg font-semibold mb-4">Información Profesional</h3>
+                                <h3 className="text-lg font-semibold mb-4 flex items-center">
+                                    <TbStethoscope className="w-5 h-5 mr-2 text-gray-700" />
+                                    Información Profesional
+                                </h3>
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                     <div>
-                                        <Label>Especialidad</Label>
+                                        <Label className="flex items-center">
+                                            <TbStethoscope className="w-5 h-5 mr-2 text-gray-500" />
+                                            Especialidad
+                                        </Label>
                                         <Input {...register('especialidad')} />
                                         {errors.especialidad && <p className="text-red-500 text-sm">{errors.especialidad?.message}</p>}
                                     </div>
                                     <div>
-                                        <Label>Número de Licencia</Label>
+                                        <Label className="flex items-center">
+                                            <TbCertificate className="w-5 h-5 mr-2 text-gray-500" />
+                                            Número de Licencia
+                                        </Label>
                                         <Input {...register('numero_licencia')} />
                                         {errors.numero_licencia && <p className="text-red-500 text-sm">{errors.numero_licencia?.message}</p>}
                                     </div>
@@ -261,13 +309,14 @@ export default function EditProfile(){
                         )}
 
                         <div className="flex justify-end space-x-4 pt-6">
-                            <Button type="button" variant="outline" onClick={handleCancel}>
+                            <Button type="button" variant="outline" onClick={handleCancel} className="flex items-center">
+                                <TbArrowLeft className="mr-2" />
                                 Cancelar
                             </Button>
                             <Button
                                 type="submit"
                                 disabled={loading}
-                                className="min-w-[150px]"
+                                className="min-w-[150px] flex items-center"
                             >
                                 {loading ? (
                                     <div className="flex items-center justify-center">
@@ -276,7 +325,7 @@ export default function EditProfile(){
                                     </div>
                                 ) : (
                                     <div className="flex items-center">
-                                        <MdSave className="mr-2" />
+                                        <TbDeviceFloppy className="mr-2" />
                                         Guardar Cambios
                                     </div>
                                 )}
@@ -287,5 +336,4 @@ export default function EditProfile(){
             </Card>
         </div>
     );
-
 }

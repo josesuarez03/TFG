@@ -9,6 +9,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import API from '@/services/api';
 import { useRouter } from 'next/router';
 import { useApiError } from '@/hooks/useApiError';
+import { TbLock, TbLockOpen, TbDeviceFloppy, TbArrowLeft } from "react-icons/tb";
 
 const changePasswordSchema = z.object({
   currentPassword: z.string().min(1, { message: 'La contraseña actual es obligatoria' }),
@@ -63,7 +64,10 @@ export default function ChangePassword() {
 
   return (
     <div className="max-w-md mx-auto mt-10 p-6 bg-white rounded-lg shadow-md">
-      <h1 className="text-2xl font-bold text-center mb-6">Cambiar Contraseña</h1>
+      <h1 className="text-2xl font-bold text-center mb-6 flex items-center justify-center">
+        <TbLock className="w-6 h-6 mr-2" />
+        Cambiar Contraseña
+      </h1>
       
       {successMessage && (
         <Alert variant="default" className="mb-4">
@@ -79,7 +83,10 @@ export default function ChangePassword() {
       
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
         <div>
-          <Label htmlFor="currentPassword">Contraseña Actual</Label>
+          <Label htmlFor="currentPassword" className="flex items-center">
+            <TbLockOpen className="w-5 h-5 mr-2 text-gray-500" />
+            Contraseña Actual
+          </Label>
           <Input 
             id="currentPassword"
             type="password" 
@@ -92,7 +99,10 @@ export default function ChangePassword() {
         </div>
         
         <div>
-          <Label htmlFor="newPassword">Nueva Contraseña</Label>
+          <Label htmlFor="newPassword" className="flex items-center">
+            <TbLock className="w-5 h-5 mr-2 text-gray-500" />
+            Nueva Contraseña
+          </Label>
           <Input 
             id="newPassword"
             type="password" 
@@ -105,7 +115,10 @@ export default function ChangePassword() {
         </div>
         
         <div>
-          <Label htmlFor="confirmPassword">Confirmar Nueva Contraseña</Label>
+          <Label htmlFor="confirmPassword" className="flex items-center">
+            <TbLock className="w-5 h-5 mr-2 text-gray-500" />
+            Confirmar Nueva Contraseña
+          </Label>
           <Input 
             id="confirmPassword"
             type="password" 
@@ -122,14 +135,27 @@ export default function ChangePassword() {
             type="button" 
             variant="outline"
             onClick={() => router.back()}
+            className="flex items-center"
           >
+            <TbArrowLeft className="mr-2" />
             Cancelar
           </Button>
           <Button 
             type="submit" 
             disabled={isSubmitting}
+            className="flex items-center"
           >
-            {isSubmitting ? 'Cambiando...' : 'Cambiar Contraseña'}
+            {isSubmitting ? (
+              <>
+                <svg className="animate-spin h-5 w-5 mr-3 text-white" viewBox="0 0 24 24"></svg>
+                Cambiando...
+              </>
+            ) : (
+              <>
+                <TbDeviceFloppy className="mr-2" />
+                Cambiar Contraseña
+              </>
+            )}
           </Button>
         </div>
       </form>

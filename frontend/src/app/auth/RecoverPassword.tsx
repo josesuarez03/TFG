@@ -9,6 +9,17 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useRouter } from 'next/router';
 import API from '@/services/api';
 import { useApiError } from '@/hooks/useApiError';
+// Importar los iconos de Tabler
+import { 
+  TbMail, 
+  TbLock, 
+  TbShieldLock, 
+  TbCheck, 
+  TbLoader, 
+  TbArrowLeft, 
+  TbAlertTriangle,
+  TbKey
+} from "react-icons/tb";
 
 // Esquema para solicitar recuperación (email)
 const requestResetSchema = z.object({
@@ -123,18 +134,34 @@ export default function RecoverPassword() {
   return (
     <div className="max-w-md mx-auto mt-10 p-6 bg-white rounded-lg shadow-md">
       <h1 className="text-2xl font-bold text-center mb-6">
-        {mode === 'request' ? 'Recuperar Contraseña' : 'Restablecer Contraseña'}
+        {mode === 'request' ? (
+          <div className="flex items-center justify-center">
+            <TbKey className="h-6 w-6 mr-2 text-blue-500" />
+            <span>Recuperar Contraseña</span>
+          </div>
+        ) : (
+          <div className="flex items-center justify-center">
+            <TbShieldLock className="h-6 w-6 mr-2 text-blue-500" />
+            <span>Restablecer Contraseña</span>
+          </div>
+        )}
       </h1>
 
       {successMessage && (
         <Alert variant="default" className="mb-4">
-          <AlertDescription>{successMessage}</AlertDescription>
+          <AlertDescription className="flex items-center">
+            <TbCheck className="h-5 w-5 mr-2 text-green-500" />
+            {successMessage}
+          </AlertDescription>
         </Alert>
       )}
       
       {error && (
         <Alert variant="destructive" className="mb-4">
-          <AlertDescription>{error.message}</AlertDescription>
+          <AlertDescription className="flex items-center">
+            <TbAlertTriangle className="h-5 w-5 mr-2" />
+            {error.message}
+          </AlertDescription>
         </Alert>
       )}
 
@@ -142,7 +169,10 @@ export default function RecoverPassword() {
         // Formulario de solicitud
         <form onSubmit={requestForm.handleSubmit(onRequestSubmit)} className="space-y-4">
           <div>
-            <Label htmlFor="email">Email</Label>
+            <Label htmlFor="email" className="flex items-center">
+              <TbMail className="h-5 w-5 mr-2 text-gray-500" />
+              Email
+            </Label>
             <Input 
               id="email"
               type="email" 
@@ -156,10 +186,20 @@ export default function RecoverPassword() {
 
           <Button 
             type="submit" 
-            className="w-full" 
+            className="w-full flex items-center justify-center" 
             disabled={isSubmitting}
           >
-            {isSubmitting ? 'Enviando...' : 'Enviar Código de Recuperación'}
+            {isSubmitting ? (
+              <>
+                <TbLoader className="animate-spin h-5 w-5 mr-2" />
+                <span>Enviando...</span>
+              </>
+            ) : (
+              <>
+                <TbMail className="h-5 w-5 mr-2" />
+                <span>Enviar Código de Recuperación</span>
+              </>
+            )}
           </Button>
 
           <p className="text-center text-sm mt-4">
@@ -169,9 +209,10 @@ export default function RecoverPassword() {
                 e.preventDefault();
                 router.push('/auth/login');
               }}
-              className="text-blue-600 hover:underline"
+              className="text-blue-600 hover:underline flex items-center justify-center"
             >
-              Volver al login
+              <TbArrowLeft className="h-4 w-4 mr-1" />
+              <span>Volver al login</span>
             </a>
           </p>
         </form>
@@ -184,7 +225,10 @@ export default function RecoverPassword() {
           />
 
           <div>
-            <Label htmlFor="password">Nueva Contraseña</Label>
+            <Label htmlFor="password" className="flex items-center">
+              <TbLock className="h-5 w-5 mr-2 text-gray-500" />
+              Nueva Contraseña
+            </Label>
             <Input 
               id="password"
               type="password" 
@@ -197,7 +241,10 @@ export default function RecoverPassword() {
           </div>
 
           <div>
-            <Label htmlFor="confirmPassword">Confirmar Contraseña</Label>
+            <Label htmlFor="confirmPassword" className="flex items-center">
+              <TbShieldLock className="h-5 w-5 mr-2 text-gray-500" />
+              Confirmar Contraseña
+            </Label>
             <Input 
               id="confirmPassword"
               type="password" 
@@ -211,10 +258,20 @@ export default function RecoverPassword() {
 
           <Button 
             type="submit" 
-            className="w-full" 
+            className="w-full flex items-center justify-center" 
             disabled={isSubmitting}
           >
-            {isSubmitting ? 'Restableciendo...' : 'Restablecer Contraseña'}
+            {isSubmitting ? (
+              <>
+                <TbLoader className="animate-spin h-5 w-5 mr-2" />
+                <span>Restableciendo...</span>
+              </>
+            ) : (
+              <>
+                <TbCheck className="h-5 w-5 mr-2" />
+                <span>Restablecer Contraseña</span>
+              </>
+            )}
           </Button>
         </form>
       )}

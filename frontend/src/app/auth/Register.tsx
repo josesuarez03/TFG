@@ -13,12 +13,19 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { TbBrandGoogle } from "react-icons/tb";
 import API from '@/services/api';
-
-
-// Unificamos el uso de iconos con react-icons en lugar de heroicons
-import { MdLock, MdEmail, MdPerson } from "react-icons/md";
+import { 
+  TbBrandGoogle, 
+  TbLock, 
+  TbMail, 
+  TbUser, 
+  TbUsers, 
+  TbLoader,
+  TbAlertTriangle,
+  TbLogin,
+  TbUserCircle,
+  TbCheckbox
+} from "react-icons/tb";
 
 const registerSchema = z.object({
     email: z.string()
@@ -142,13 +149,23 @@ export default function Register() {
                     height={100}
                     className="mx-auto mb-4"
                 />
-                Registro como {getUserTypeText()}
+                <div className="flex items-center justify-center">
+                    {typeof type === 'string' && type === 'doctor' ? (
+                        <TbUserCircle className="w-6 h-6 mr-2 text-blue-500" />
+                    ) : (
+                        <TbUsers className="w-6 h-6 mr-2 text-blue-500" />
+                    )}
+                    <span>Registro como {getUserTypeText()}</span>
+                </div>
             </CardTitle>
           </CardHeader>
           <CardContent>
             {(authError || error) && (
                 <Alert variant="destructive" className="mb-4">
-                    <AlertDescription>{authError || error}</AlertDescription>
+                    <AlertDescription className="flex items-center">
+                        <TbAlertTriangle className="w-5 h-5 mr-2" />
+                        <span>{authError || error}</span>
+                    </AlertDescription>
                 </Alert>
             )}
           
@@ -177,40 +194,40 @@ export default function Register() {
 
             <form onSubmit={handleSubmit(onSubmit)} className='space-y-4'>
                 <div>
-                    <Label>
-                        <MdEmail className="w-5 h-5 inline-block mr-2 text-gray-500" />
+                    <Label className="flex items-center">
+                        <TbMail className="w-5 h-5 mr-2 text-gray-500" />
                         Email
                     </Label>
                     <Input type="email" {...register('email')} />
                     {errors.email && <p className="text-red-500 text-sm">{errors.email.message}</p>}
                 </div>
                 <div>
-                    <Label>
-                        <MdPerson className="w-5 h-5 inline-block mr-2 text-gray-500" />
+                    <Label className="flex items-center">
+                        <TbUser className="w-5 h-5 mr-2 text-gray-500" />
                         Nombre
                     </Label>
                     <Input type="text" {...register('first_name')} />
                     {errors.first_name && <p className="text-red-500 text-sm">{errors.first_name.message}</p>}
                 </div>
                 <div>
-                    <Label>
-                        <MdPerson className="w-5 h-5 inline-block mr-2 text-gray-500" />
+                    <Label className="flex items-center">
+                        <TbUsers className="w-5 h-5 mr-2 text-gray-500" />
                         Apellido
                     </Label>
                     <Input type="text" {...register('last_name')} />
                     {errors.last_name && <p className="text-red-500 text-sm">{errors.last_name.message}</p>}
                 </div>
                 <div>
-                    <Label>
-                        <MdLock className="w-5 h-5 inline-block mr-2 text-gray-500" />
+                    <Label className="flex items-center">
+                        <TbLock className="w-5 h-5 mr-2 text-gray-500" />
                         Contraseña
                     </Label>
                     <Input type="password" {...register('password')} />
                     {errors.password && <p className="text-red-500 text-sm">{errors.password.message}</p>}
                 </div>
                 <div>
-                    <Label>
-                        <MdLock className="w-5 h-5 inline-block mr-2 text-gray-500" />
+                    <Label className="flex items-center">
+                        <TbCheckbox className="w-5 h-5 mr-2 text-gray-500" />
                         Confirmar Contraseña
                     </Label>
                     <Input type="password" {...register('confirmPassword')} />
@@ -220,18 +237,29 @@ export default function Register() {
                 {/* Campo oculto para el tipo de usuario */}
                 <input type="hidden" {...register('tipo')} />
                 
-                <Button type="submit" disabled={loading || authLoading} className="w-full">
+                <Button type="submit" disabled={loading || authLoading} className="w-full flex items-center justify-center">
                     {(loading || authLoading) ? (
-                        <div className="flex items-center justify-center">
-                            <svg className="animate-spin h-5 w-5 mr-3 text-white" viewBox="0 0 24 24"></svg>
-                            <span className="text-white">Cargando...</span>
-                        </div>
-                    ) : 'Registrarse'}
+                        <>
+                            <TbLoader className="animate-spin h-5 w-5 mr-3" />
+                            <span>Cargando...</span>
+                        </>
+                    ) : (
+                        <>
+                            <TbUserCircle className="h-5 w-5 mr-2" />
+                            <span>Registrarse</span>
+                        </>
+                    )}
                 </Button>
             </form>
           </CardContent>
           <CardFooter className="text-center">
-                <p>¿Ya tienes cuenta? <Link href="/auth/login" className="text-blue-500 hover:underline">Inicia sesión</Link></p>
+                <p className="flex items-center justify-center">
+                    ¿Ya tienes cuenta? 
+                    <Link href="/auth/login" className="text-blue-500 hover:underline ml-2 flex items-center">
+                        <TbLogin className="w-4 h-4 mr-1" />
+                        <span>Inicia sesión</span>
+                    </Link>
+                </p>
             </CardFooter>
         </Card>
     );

@@ -13,6 +13,19 @@ import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import API from '@/services/api';
+// Importar los iconos de Tabler que necesitamos
+import { 
+    TbCalendarTime, 
+    TbPhone, 
+    TbMapPin, 
+    TbGenderBigender, 
+    TbBriefcase, 
+    TbAlertTriangle, 
+    TbStethoscope, 
+    TbLicense, 
+    TbCheck, 
+    TbLoader 
+} from "react-icons/tb";
 
 const completeProfileSchema = z.object({
     fecha_nacimiento: z.string().min(1, { message: 'La fecha de nacimiento es obligatoria' }),
@@ -102,8 +115,8 @@ export default function CompleteProfile() {
     if (authLoading) {
         return (
             <div className="flex justify-center items-center h-screen">
-                <svg className="animate-spin h-5 w-5 mr-3 text-white" viewBox="0 0 24 24"></svg>
-                <span className="text-white">Cargando...</span>
+                <TbLoader className="animate-spin h-8 w-8 mr-3 text-primary" />
+                <span>Cargando...</span>
             </div>
         );
     }
@@ -145,19 +158,28 @@ export default function CompleteProfile() {
                 {success && (
                     <Alert className="mb-4 bg-green-50 border-green-500">
                         <AlertDescription className="text-green-700">
-                            ¡Perfil actualizado correctamente! Redirigiendo...
+                            <div className="flex items-center">
+                                <TbCheck className="h-5 w-5 mr-2 text-green-500" />
+                                ¡Perfil actualizado correctamente! Redirigiendo...
+                            </div>
                         </AlertDescription>
                     </Alert>
                 )}
                 <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
-                            <Label>Fecha de Nacimiento</Label>
+                            <Label className="flex items-center">
+                                <TbCalendarTime className="h-5 w-5 mr-2 text-gray-500" />
+                                Fecha de Nacimiento
+                            </Label>
                             <Input type="date" {...register('fecha_nacimiento')} />
                             {errors.fecha_nacimiento && <p className="text-red-500 text-sm">{errors.fecha_nacimiento.message}</p>}
                         </div>
                         <div>
-                            <Label>Género</Label>
+                            <Label className="flex items-center">
+                                <TbGenderBigender className="h-5 w-5 mr-2 text-gray-500" />
+                                Género
+                            </Label>
                             <Controller
                                 name="genero"
                                 control={control}
@@ -178,12 +200,18 @@ export default function CompleteProfile() {
                             {errors.genero && <p className="text-red-500 text-sm">{errors.genero.message}</p>}
                         </div>
                         <div>
-                            <Label>Teléfono</Label>
+                            <Label className="flex items-center">
+                                <TbPhone className="h-5 w-5 mr-2 text-gray-500" />
+                                Teléfono
+                            </Label>
                             <Input {...register('telefono')} />
                             {errors.telefono && <p className="text-red-500 text-sm">{errors.telefono.message}</p>}
                         </div>
                         <div>
-                            <Label>Dirección</Label>
+                            <Label className="flex items-center">
+                                <TbMapPin className="h-5 w-5 mr-2 text-gray-500" />
+                                Dirección
+                            </Label>
                             <Input {...register('direccion')} />
                             {errors.direccion && <p className="text-red-500 text-sm">{errors.direccion.message}</p>}
                         </div>
@@ -191,12 +219,18 @@ export default function CompleteProfile() {
                     {user.tipo === 'patient' && (
                         <>
                             <div>
-                                <Label>Ocupación</Label>
+                                <Label className="flex items-center">
+                                    <TbBriefcase className="h-5 w-5 mr-2 text-gray-500" />
+                                    Ocupación
+                                </Label>
                                 <Input {...register('ocupacion')} />
                                 {errors.ocupacion && <p className="text-red-500 text-sm">{errors.ocupacion?.message}</p>}
                             </div>
                             <div>
-                                <Label>Alergias (opcional)</Label>
+                                <Label className="flex items-center">
+                                    <TbAlertTriangle className="h-5 w-5 mr-2 text-gray-500" />
+                                    Alergias (opcional)
+                                </Label>
                                 <Textarea {...register('allergies')} />
                             </div>
                         </>
@@ -204,12 +238,18 @@ export default function CompleteProfile() {
                     {user.tipo === 'doctor' && (
                         <>
                             <div>
-                                <Label>Especialidad</Label>
+                                <Label className="flex items-center">
+                                    <TbStethoscope className="h-5 w-5 mr-2 text-gray-500" />
+                                    Especialidad
+                                </Label>
                                 <Input {...register('especialidad')} />
                                 {errors.especialidad && <p className="text-red-500 text-sm">{errors.especialidad?.message}</p>}
                             </div>
                             <div>
-                                <Label>Número de Licencia</Label>
+                                <Label className="flex items-center">
+                                    <TbLicense className="h-5 w-5 mr-2 text-gray-500" />
+                                    Número de Licencia
+                                </Label>
                                 <Input {...register('numero_licencia')} />
                                 {errors.numero_licencia && <p className="text-red-500 text-sm">{errors.numero_licencia?.message}</p>}
                             </div>
@@ -222,10 +262,15 @@ export default function CompleteProfile() {
                     >
                         {loading ? (
                             <div className="flex items-center justify-center">
-                                <svg className="animate-spin h-5 w-5 mr-3 text-white" viewBox="0 0 24 24"></svg>
-                                <span className="text-white">Guardando...</span>
+                                <TbLoader className="animate-spin h-5 w-5 mr-3" />
+                                <span>Guardando...</span>
                             </div>
-                        ) : 'Guardar y Continuar'}
+                        ) : (
+                            <div className="flex items-center justify-center">
+                                <TbCheck className="h-5 w-5 mr-2" />
+                                <span>Guardar y Continuar</span>
+                            </div>
+                        )}
                     </Button>
                 </form>
             </CardContent>
