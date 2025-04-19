@@ -2,7 +2,6 @@ import React from 'react';
 import { ThemeProvider } from 'next-themes';
 import ContentLayout from '@/components/layout/ContentLayout';
 
-
 export const metadata = {
     title: {
       default: 'Medicheck',
