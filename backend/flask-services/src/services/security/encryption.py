@@ -1,15 +1,26 @@
 from cryptography.fernet import Fernet
 import base64
 import os
+import jwt
+from config.config import Config
 
 class Encryption:
 
-    def __init__(self, key=None):
-        
-        if key:
-            self.key = key
+    def __init__(self, jwt_token=None):
+
+        if jwt_token:
+            try:
+                # Decodificar el token JWT para obtener datos únicos
+                payload = jwt.decode(jwt_token, Config.JWT_SECRET, algorithms=[Config.JWT_ALGORITHM])
+                # Usar una parte del payload decodificado como clave
+                key_data = str(payload).encode('utf-8')
+                self.key = base64.urlsafe_b64encode(key_data[:32])  # Asegurarse de que la clave tenga 32 bytes
+            except jwt.InvalidTokenError:
+                raise ValueError("El token JWT proporcionado no es válido.")
         else:
+            # Generar una clave aleatoria si no se proporciona un token JWT
             self.key = Fernet.generate_key()
+
         self.cipher = Fernet(self.key)
 
     def encrypt_string(self, text):
