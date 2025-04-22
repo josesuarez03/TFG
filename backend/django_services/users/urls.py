@@ -8,7 +8,7 @@ from .views import (
     PasswordResetVerifyView, ChangePasswordView, AccountDeleteView, 
     PatientHistoryCreateView, PatientHistoryViewSet, PatientViewSet,
     DoctorViewSet, ChatbotPatientUpdateView, PatientMeView, 
-    PatientMeHistoryView, DoctorPatientRelationViewSet
+    PatientMeHistoryView, DoctorPatientRelationViewSet, PatientMedicalDataUpdateView
 )
 
 router = DefaultRouter()
@@ -50,6 +50,9 @@ urlpatterns = [
     # Actualización por chatbot
     path('patients/<uuid:patient_id>/chatbot-update/', ChatbotPatientUpdateView.as_view(), name='patient-chatbot-update'),
     path('patients/me/chatbot-update/', ChatbotPatientUpdateView.as_view(), name='patient-me-chatbot-update'),
+
+    # Actualización de datos médicos por Flask
+    path('api/patients/medical_data_update/', PatientMedicalDataUpdateView.as_view(), name='medical_data_update'),
     
     # ViewSets
     path('', include(router.urls)),
