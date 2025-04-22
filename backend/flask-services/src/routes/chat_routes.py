@@ -4,6 +4,8 @@ from . import bp
 from routes.utils import process_message_logic, conversational_dataset_manager
 from services.auth.auth import get_user_id_token
 from services.security.encryption import Encryption
+from services.api.send_api import send_data_to_django
+from services.process_data.medical_data import MedicalDataProcessor
 
 # Configurar logger
 logger = logging.getLogger(__name__)
@@ -137,3 +139,52 @@ def sync_redis_to_mongo():
     except Exception as e:
         logger.error(f"Error en la sincronización: {str(e)}")
         return jsonify({"error": f"Error en la sincronización: {str(e)}"}), 500
+    
+@bp.route('process_medical_data', methods=['POST'])
+def process_medical_data():
+
+    user_id = get_user_id_token(request)
+    data = request.get_json()
+
+    if not user_id:
+        user_id = request.args.get('user_id')
+    
+    if not user_id:
+        return jsonify({"error": "Se requiere autenticación válida."}), 401
+    
+    conversation_id = data.get('conversation_id')
+    django_api_url = data.get('django_api_url', None)
+    
+    if not conversation_id:
+        return jsonify({"error": "Se requiere ID de conversación"}), 400
+    
+    if not django_api_url:
+        return jsonify({"error": "Se requiere URL de API de Django"}), 400
+    
+    try:
+        # Decrypt conversation ID if encrypted
+        try:
+            conversation_id = Encryption.decrypt_string(conversation_id)
+        except ValueError:
+            # If not encrypted or invalid, use as is
+            pass
+        
+        # Process the medical data from conversation
+        medical_data = MedicalDataProcessor.process_medical_data(user_id, conversation_id)
+        
+        if not medical_data or 'error' in medical_data:
+            return jsonify(medical_data or {"error": "No se pudo procesar la conversación."}), 400
+        
+        # Send processed data to Django for storage
+        django_response = send_data_to_django(user_id, medical_data)
+        
+        return jsonify({
+            "success": True,
+            "message": "Datos médicos procesados correctamente.",
+            "medical_data": medical_data,
+            "django_response": django_response
+        })
+    
+    except Exception as e:
+        logger.error(f"Error al procesar datos médicos: {str(e)}")
+        return jsonify({"error": f"Error al procesar datos médicos: {str(e)}"}), 500
