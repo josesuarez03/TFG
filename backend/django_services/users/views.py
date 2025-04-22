@@ -2,12 +2,16 @@ from django.contrib.auth import get_user_model
 from django.conf import settings
 from django.db import transaction
 from django.shortcuts import get_object_or_404
+from django.utils import timezone
+from django.http import Http404
+from django.core.exceptions import PermissionDenied
 
 from rest_framework import status, viewsets, generics, mixins
 from rest_framework.decorators import api_view, permission_classes, action
 from rest_framework.permissions import IsAuthenticated, IsAdminUser, AllowAny
 from rest_framework.response import Response
 from rest_framework.views import APIView
+from rest_framework.pagination import PageNumberPagination
 
 from rest_framework_simplejwt.tokens import RefreshToken
 from social_django.utils import load_strategy, load_backend
@@ -23,9 +27,10 @@ from .serializers import (
     GoogleOAuthUserInfoSerializer, RequiredOAuthUserSerializer, 
     PatientSerializer, DoctorSerializer, ChatbotAnalysisSerializer,
     PasswordResetRequestSerializer, PasswordResetVerifySerializer,
-    ChangePasswordSerializer, AccountDeleteSerializer
+    ChangePasswordSerializer, AccountDeleteSerializer, PatientHistoryEntrySerializer,
+    DoctorPatientRelationSerializer
 )
-from .models import Patient, Doctor
+from .models import Patient, Doctor, PatientHistoryEntry, DoctorPatientRelation
 
 User = get_user_model()
 
@@ -57,44 +62,33 @@ class GoogleOAuthLoginView(APIView):
     @transaction.atomic
     def post(self, request):
         serializer = self.serializer_class(data=request.data)
-        if not serializer.is_valid():
-            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-            
+        serializer.is_valid(raise_exception=True)  # Simplifica la validación
+
         token = serializer.validated_data['token']
-        
+        provider = 'google-oauth2'
+
         try:
-            # Proveedor Google OAuth2
-            provider = 'google-oauth2'
-            
-            # Cargar la estrategia y backend para Google
             strategy = load_strategy(request)
             backend = load_backend(strategy, provider, redirect_uri=None)
-            
-            # Autenticar con el token
             user = backend.do_auth(token)
-            
+
             if not user:
                 return Response(
                     {"error": "Error de autenticación con Google."},
                     status=status.HTTP_400_BAD_REQUEST
                 )
-            
-            # Guardar información del proveedor OAuth
+
+            # Actualizar campos del usuario
             user.oauth_provider = 'google'
-            if not user.oauth_uid and hasattr(user, 'social_user'):
-                user.oauth_uid = user.social_user.uid
-                
-            # Si se proporciona el tipo de usuario en la solicitud y es un usuario nuevo
+            user.oauth_uid = getattr(user, 'social_user', {}).get('uid', user.oauth_uid)
             is_new_user = user.date_joined == user.last_login
+
             if is_new_user and 'tipo' in request.data:
                 user.tipo = request.data.get('tipo', 'patient')
-                
+
             user.save(update_fields=['oauth_provider', 'oauth_uid', 'tipo'])
-                
-            # Generar tokens JWT
+
             refresh = RefreshToken.for_user(user)
-            
-            # Si es un usuario nuevo, marcar que debe completar su perfil
             response_data = {
                 'user': UserProfileSerializerBasic(user).data,
                 'refresh': str(refresh),
@@ -102,9 +96,9 @@ class GoogleOAuthLoginView(APIView):
                 'is_new_user': is_new_user,
                 'profile_complete': user.is_profile_completed
             }
-            
+
             return Response(response_data, status=status.HTTP_200_OK)
-            
+
         except (MissingBackend, AuthTokenError, AuthForbidden) as e:
             return Response(
                 {"error": f"Error en autenticación con Google: {str(e)}"},
@@ -279,14 +273,21 @@ class ChatbotPatientUpdateView(APIView):
                 status=status.HTTP_400_BAD_REQUEST
             )
             
-        # Actualizar la información del paciente
-        updated = patient.update_from_chatbot_analysis(serializer.validated_data)
+        # Actualizar la información del paciente - ahora pasamos el usuario que realiza la actualización
+        updated = patient.update_from_chatbot_analysis(
+            serializer.validated_data, 
+            created_by=request.user if not request.user.is_anonymous else None
+        )
         
         if updated:
+            # Obtener la última entrada de historial creada
+            latest_history = patient.history_entries.first()
+            
             return Response({
                 "message": "Información del paciente actualizada correctamente",
                 "patient": PatientSerializer(patient).data,
-                "profile_complete": patient.user.is_profile_completed
+                "profile_complete": patient.user.is_profile_completed,
+                "history_entry": PatientHistoryEntrySerializer(latest_history).data if latest_history else None
             }, status=status.HTTP_200_OK)
         else:
             return Response({
@@ -298,14 +299,25 @@ class PatientViewSet(viewsets.ModelViewSet):
     queryset = Patient.objects.all()
     serializer_class = PatientSerializer
     permission_classes = [IsAuthenticated]
+    pagination_class = PageNumberPagination  # Añadir paginación
     
     def get_queryset(self):
         user = self.request.user
         # Los pacientes solo pueden ver su propio perfil
         if user.tipo == 'patient':
             return Patient.objects.filter(user=user)
-        # Doctores y administradores pueden ver todos los pacientes
-        elif user.tipo in ['doctor', 'admin']:
+        # Doctores solo pueden ver sus pacientes asignados
+        elif user.tipo == 'doctor':
+            try:
+                doctor = Doctor.objects.get(user=user)
+                return Patient.objects.filter(
+                    doctor_relations__doctor=doctor,
+                    doctor_relations__active=True
+                ).distinct()
+            except Doctor.DoesNotExist:
+                return Patient.objects.none()
+        # Administradores pueden ver todos los pacientes
+        elif user.tipo == 'admin':
             return Patient.objects.all()
         return Patient.objects.none()
     
@@ -317,11 +329,189 @@ class PatientViewSet(viewsets.ModelViewSet):
         data = serializer.data
         data['user'] = user_data
         return Response(data)
+    
+    @action(detail=True, methods=['get'])
+    def history(self, request, pk=None):
+        """Acción para obtener el historial médico de un paciente específico"""
+        patient = self.get_object()
+        
+        # Configurar paginación para el historial
+        paginator = PageNumberPagination()
+        paginator.page_size = 10  # Puedes ajustar esto según necesites
+        
+        history_entries = patient.history_entries.all().order_by('-created_at')
+        page = paginator.paginate_queryset(history_entries, request)
+        
+        if page is not None:
+            serializer = PatientHistoryEntrySerializer(page, many=True)
+            return paginator.get_paginated_response(serializer.data)
+            
+        serializer = PatientHistoryEntrySerializer(history_entries, many=True)
+        return Response(serializer.data)
+class PatientHistoryViewSet(viewsets.ReadOnlyModelViewSet):
+    """ViewSet para acceder al historial médico de un paciente"""
+    serializer_class = PatientHistoryEntrySerializer
+    permission_classes = [IsAuthenticated]
+    pagination_class = PageNumberPagination  # Añadir paginación
+    
+    def get_queryset(self):
+        patient_id = self.kwargs.get('patient_id')
+        user = self.request.user
+        
+        # Verificar permisos
+        if not patient_id:
+            return PatientHistoryEntry.objects.none()
+        
+        try:
+            patient = Patient.objects.get(id=patient_id)
+            
+            # Pacientes solo pueden ver su propio historial
+            if user.tipo == 'patient' and user.id != patient.user.id:
+                return PatientHistoryEntry.objects.none()
+                
+            # Doctores pueden ver el historial de sus pacientes
+            if user.tipo == 'doctor':
+                # Verificar si existe una relación doctor-paciente activa
+                has_relation = DoctorPatientRelation.objects.filter(
+                    doctor__user=user, 
+                    patient=patient,
+                    active=True
+                ).exists()
+                
+                if not has_relation:
+                    return PatientHistoryEntry.objects.none()
+            
+            # Retornar historial ordenado por fecha (más reciente primero)
+            return PatientHistoryEntry.objects.filter(patient=patient).order_by('-created_at')
+            
+        except Patient.DoesNotExist:
+            return PatientHistoryEntry.objects.none()
 
+class PatientHistoryCreateView(APIView):
+    """Vista para crear manualmente una entrada en el historial del paciente"""
+    permission_classes = [IsAuthenticated]
+    
+    def post(self, request, patient_id):
+        try:
+            patient = Patient.objects.get(id=patient_id)
+            
+            # Verificar permisos
+            user = request.user
+            if user.tipo == 'patient' and user.id != patient.user.id:
+                return Response(
+                    {"error": "No tienes permisos para modificar este paciente"},
+                    status=status.HTTP_403_FORBIDDEN
+                )
+                
+            if user.tipo == 'doctor':
+                # Verificar si es médico del paciente
+                has_relation = DoctorPatientRelation.objects.filter(
+                    doctor__user=user, 
+                    patient=patient,
+                    active=True
+                ).exists()
+                
+                if not has_relation:
+                    return Response(
+                        {"error": "No eres médico asignado a este paciente"},
+                        status=status.HTTP_403_FORBIDDEN
+                    )
+            
+            # Preparar datos para el historial
+            history_data = {
+                'patient': patient,
+                'source': user.tipo,  # 'patient', 'doctor', 'admin'
+                'created_by': user,
+                'notes': request.data.get('notes', '')
+            }
+            
+            # Campos médicos que se pueden actualizar
+            medical_fields = [
+                'triaje_level', 'pain_scale', 'medical_context',
+                'allergies', 'medications', 'medical_history', 'ocupacion'
+            ]
+            
+            # Copiar valores actuales al historial
+            for field in medical_fields:
+                history_data[field] = getattr(patient, field)
+            
+            # Opcional: actualizar campos si se proporcionan en la solicitud
+            update_current = request.data.get('update_current', False)
+            fields_to_update = []
+            
+            if update_current:
+                for field in medical_fields:
+                    if field in request.data and request.data[field] is not None:
+                        # Guardar para actualizar el paciente después
+                        setattr(patient, field, request.data[field])
+                        fields_to_update.append(field)
+            
+            # Crear entrada de historial
+            history_entry = PatientHistoryEntry.objects.create(**history_data)
+            
+            # Actualizar datos actuales del paciente si es necesario
+            if update_current and fields_to_update:
+                # Si es un médico, validar los datos
+                if user.tipo == 'doctor':
+                    doctor = Doctor.objects.get(user=user)
+                    patient.is_data_validated = True
+                    patient.data_validated_by = doctor
+                    patient.data_validated_at = timezone.now()
+                    fields_to_update.extend(['is_data_validated', 'data_validated_by', 'data_validated_at'])
+                
+                patient.save(update_fields=fields_to_update)
+                patient.user.check_profile_completion()
+            
+            return Response(
+                PatientHistoryEntrySerializer(history_entry).data,
+                status=status.HTTP_201_CREATED
+            )
+            
+        except Patient.DoesNotExist:
+            return Response(
+                {"error": "Paciente no encontrado"},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        except Doctor.DoesNotExist:
+            return Response(
+                {"error": "Perfil de doctor no encontrado"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+class PatientMeView(generics.RetrieveAPIView):
+    """Vista para que un paciente vea su propio perfil médico"""
+    serializer_class = PatientSerializer
+    permission_classes = [IsAuthenticated]
+    
+    def get_object(self):
+        if self.request.user.tipo != 'patient':
+            raise PermissionDenied("Solo los pacientes pueden acceder a esta vista")
+        
+        try:
+            return Patient.objects.get(user=self.request.user)
+        except Patient.DoesNotExist:
+            raise Http404("No tienes un perfil de paciente configurado")
+
+class PatientMeHistoryView(generics.ListAPIView):
+    """Vista para que un paciente vea su propio historial médico"""
+    serializer_class = PatientHistoryEntrySerializer
+    permission_classes = [IsAuthenticated]
+    pagination_class = PageNumberPagination
+    
+    def get_queryset(self):
+        if self.request.user.tipo != 'patient':
+            return PatientHistoryEntry.objects.none()
+        
+        try:
+            patient = Patient.objects.get(user=self.request.user)
+            return PatientHistoryEntry.objects.filter(patient=patient).order_by('-created_at')
+        except Patient.DoesNotExist:
+            return PatientHistoryEntry.objects.none()
 class DoctorViewSet(viewsets.ModelViewSet):
-    """ViewSet para administrar doctores (solo admin)"""
+    """ViewSet para administrar doctores"""
     queryset = Doctor.objects.all()
     serializer_class = DoctorSerializer
+    pagination_class = PageNumberPagination  # Añadir paginación
     
     def get_permissions(self):
         if self.action in ['list', 'retrieve']:
@@ -338,13 +528,73 @@ class DoctorViewSet(viewsets.ModelViewSet):
             return Doctor.objects.all()
         # Pacientes pueden ver la lista de doctores pero sin detalles sensibles
         elif user.tipo == 'patient' and self.action == 'list':
-            return Doctor.objects.all()
+            # Para pacientes, mostrar solo doctores activos
+            return Doctor.objects.filter(user__is_active=True)
         return Doctor.objects.none()
     
     def retrieve(self, request, *args, **kwargs):
         instance = self.get_object()
         serializer = self.get_serializer(instance)
-        # Incluir información
+        # Incluir información del usuario asociado
+        user_data = UserProfileSerializerBasic(instance.user).data
+        data = serializer.data
+        data['user'] = user_data
+        return Response(data)
+    
+    @action(detail=True, methods=['get'])
+    def patients(self, request, pk=None):
+        """Acción para obtener los pacientes de un doctor específico"""
+        doctor = self.get_object()
+        
+        # Verificar permisos
+        if request.user.tipo not in ['admin', 'doctor'] or \
+           (request.user.tipo == 'doctor' and request.user != doctor.user):
+            return Response(
+                {"error": "No tienes permisos para ver estos pacientes"},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        # Obtener pacientes activos del doctor
+        patients = Patient.objects.filter(
+            doctor_relations__doctor=doctor,
+            doctor_relations__active=True
+        ).distinct()
+        
+        # Configurar paginación
+        paginator = PageNumberPagination()
+        paginator.page_size = 10  # Puedes ajustar esto según necesites
+        page = paginator.paginate_queryset(patients, request)
+        
+        if page is not None:
+            serializer = PatientBasicSerializer(page, many=True)
+            return paginator.get_paginated_response(serializer.data)
+            
+        serializer = PatientBasicSerializer(patients, many=True)
+        return Response(serializer.data)
+    
+class DoctorPatientRelationViewSet(viewsets.ModelViewSet):
+    """ViewSet para gestionar relaciones entre doctores y pacientes"""
+    serializer_class = DoctorPatientRelationSerializer
+    permission_classes = [IsAuthenticated]
+    
+    def get_queryset(self):
+        user = self.request.user
+        if user.tipo == 'patient':
+            try:
+                patient = Patient.objects.get(user=user)
+                return DoctorPatientRelation.objects.filter(patient=patient)
+            except Patient.DoesNotExist:
+                return DoctorPatientRelation.objects.none()
+        elif user.tipo == 'doctor':
+            try:
+                doctor = Doctor.objects.get(user=user)
+                return DoctorPatientRelation.objects.filter(doctor=doctor)
+            except Doctor.DoesNotExist:
+                return DoctorPatientRelation.objects.none()
+        elif user.tipo == 'admin':
+            return DoctorPatientRelation.objects.all()
+        return DoctorPatientRelation.objects.none()
+    
 
 class PasswordResetRequestView(APIView):
     """Vista para solicitar el restablecimiento de contraseña por código de verificación"""

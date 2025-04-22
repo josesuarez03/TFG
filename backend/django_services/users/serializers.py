@@ -2,7 +2,7 @@ from rest_framework import serializers
 from django.contrib.auth import get_user_model
 from django.contrib.auth.password_validation import validate_password
 from rest_framework.validators import UniqueValidator
-from .models import Patient, Doctor
+from .models import Patient, Doctor, DoctorPatientRelation, PatientHistoryEntry
 
 User = get_user_model()
 
@@ -40,18 +40,79 @@ class UserSerializer(serializers.ModelSerializer):
         user.save()
         return user
 
+class DoctorBasicSerializer(serializers.ModelSerializer):
+    """Serializador básico para información de doctores"""
+    full_name = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = Doctor
+        fields = ('id', 'especialidad', 'full_name')
+    
+    def get_full_name(self, obj):
+        return f"Dr. {obj.user.first_name} {obj.user.last_name}"
+
+class PatientBasicSerializer(serializers.ModelSerializer):
+    """Serializador básico para información de pacientes"""
+    full_name = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = Patient
+        fields = ('id', 'full_name', 'is_data_validated')
+    
+    def get_full_name(self, obj):
+        return f"{obj.user.first_name} {obj.user.last_name}"
+
+class DoctorPatientRelationSerializer(serializers.ModelSerializer):
+    """Serializador para la relación médico-paciente"""
+    doctor_name = serializers.SerializerMethodField(read_only=True)
+    patient_name = serializers.SerializerMethodField(read_only=True)
+    
+    class Meta:
+        model = DoctorPatientRelation
+        fields = ('id', 'doctor', 'doctor_name', 'patient', 'patient_name', 
+                 'is_primary_doctor', 'start_date', 'end_date', 'active', 'notes')
+        read_only_fields = ('id', 'doctor_name', 'patient_name')
+    
+    def get_doctor_name(self, obj):
+        return f"Dr. {obj.doctor.user.first_name} {obj.doctor.user.last_name}"
+    
+    def get_patient_name(self, obj):
+        return f"{obj.patient.user.first_name} {obj.patient.user.last_name}"
+
 class PatientSerializer(serializers.ModelSerializer):
+    doctors = DoctorBasicSerializer(many=True, read_only=True)
+    data_validator = serializers.SerializerMethodField(read_only=True)
+    history_count = serializers.SerializerMethodField(read_only=True)
+    
     class Meta:
         model = Patient
         fields = ('id', 'triaje_level', 'ocupacion', 'pain_scale', 'medical_context', 
-                  'allergies', 'medications', 'medical_history', 'last_chatbot_analysis')
-        read_only_fields = ('id', 'last_chatbot_analysis')
+                  'allergies', 'medications', 'medical_history', 'last_chatbot_analysis',
+                  'is_data_validated', 'data_validated_by', 'data_validated_at', 
+                  'data_validator', 'doctors', 'history_count')
+        read_only_fields = ('id', 'last_chatbot_analysis', 'data_validated_at', 
+                           'data_validator', 'doctors', 'history_count')
+    
+    def get_data_validator(self, obj):
+        if obj.data_validated_by:
+            return f"Dr. {obj.data_validated_by.user.first_name} {obj.data_validated_by.user.last_name}"
+        return None
+    
+    def get_history_count(self, obj):
+        return obj.history_entries.count()
 
 class DoctorSerializer(serializers.ModelSerializer):
+    patients = PatientBasicSerializer(many=True, read_only=True)
+    full_name = serializers.SerializerMethodField(read_only=True)
+    
     class Meta:
         model = Doctor
-        fields = ('id', 'especialidad', 'numero_licencia')
-        read_only_fields = ('id',)
+        fields = ('id', 'especialidad', 'numero_licencia', 'patients', 'full_name')
+        read_only_fields = ('id', 'patients', 'full_name')
+    
+    def get_full_name(self, obj):
+        return f"Dr. {obj.user.first_name} {obj.user.last_name}"
+
 
 class UserProfileSerializer(serializers.ModelSerializer):
     patient = PatientSerializer(required=False)
@@ -188,3 +249,25 @@ class ChangePasswordSerializer(serializers.Serializer):
 
 class AccountDeleteSerializer(serializers.Serializer):
     password = serializers.CharField(required=False)
+
+class PatientHistoryEntrySerializer(serializers.ModelSerializer):
+    """Serializador para las entradas del historial médico del paciente"""
+    created_by_name = serializers.SerializerMethodField(read_only=True)
+    source_display = serializers.SerializerMethodField(read_only=True)
+    
+    class Meta:
+        model = PatientHistoryEntry
+        fields = ('id', 'created_at', 'source', 'source_display', 'created_by', 'created_by_name',
+                  'notes', 'triaje_level', 'pain_scale', 'medical_context', 'allergies',
+                  'medications', 'medical_history', 'ocupacion')
+        read_only_fields = ('id', 'created_at', 'created_by_name', 'source_display')
+    
+    def get_created_by_name(self, obj):
+        if obj.created_by:
+            if obj.created_by.tipo == 'doctor':
+                return f"Dr. {obj.created_by.first_name} {obj.created_by.last_name}"
+            return f"{obj.created_by.first_name} {obj.created_by.last_name}"
+        return None
+    
+    def get_source_display(self, obj):
+        return dict(PatientHistoryEntry._meta.get_field('source').choices).get(obj.source)

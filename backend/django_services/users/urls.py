@@ -5,18 +5,25 @@ from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 from .views import (
     RegisterUserView, GoogleOAuthLoginView, CompleteProfileView,
     UserProfileView, UserViewSet, PasswordResetRequestView, 
-    PasswordResetVerifyView, ChangePasswordView, AccountDeleteView
+    PasswordResetVerifyView, ChangePasswordView, AccountDeleteView, 
+    PatientHistoryCreateView, PatientHistoryViewSet, PatientViewSet,
+    DoctorViewSet, ChatbotPatientUpdateView, PatientMeView, 
+    PatientMeHistoryView, DoctorPatientRelationViewSet
 )
 
 router = DefaultRouter()
 router.register(r'admin/users', UserViewSet)
+router.register(r'patients/(?P<patient_id>[^/.]+)/history', PatientHistoryViewSet, basename='patient-history')
+router.register(r'patients', PatientViewSet, basename='patients')
+router.register(r'doctors', DoctorViewSet, basename='doctors')
+router.register(r'doctor-patient-relations', DoctorPatientRelationViewSet, basename='doctor-patient-relations')
 
 urlpatterns = [
     # Autenticación básica
-    path('login/', TokenObtainPairView.as_view(), name='token_obtain_pair'),  # Login estándar
+    path('login/', TokenObtainPairView.as_view(), name='token_obtain_pair'),
     path('register/', RegisterUserView.as_view(), name='register'),
     path('token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
-    path('token/verify/', TokenVerifyView.as_view(), name='token_verify'),  # Verificación de tokens
+    path('token/verify/', TokenVerifyView.as_view(), name='token_verify'),
     
     # Google OAuth
     path('google/login/', GoogleOAuthLoginView.as_view(), name='google_oauth_login'),
@@ -32,7 +39,18 @@ urlpatterns = [
     
     # Eliminación de cuenta
     path('account/delete/', AccountDeleteView.as_view(), name='account_delete'),
+
+    # Historial médico
+    path('patients/<uuid:patient_id>/history/create/', PatientHistoryCreateView.as_view(), name='patient-history-create'),
     
-    # ViewSet de administración de usuarios
+    # Vistas específicas para pacientes
+    path('patients/me/', PatientMeView.as_view(), name='patient-me'),
+    path('patients/me/history/', PatientMeHistoryView.as_view(), name='patient-me-history'),
+    
+    # Actualización por chatbot
+    path('patients/<uuid:patient_id>/chatbot-update/', ChatbotPatientUpdateView.as_view(), name='patient-chatbot-update'),
+    path('patients/me/chatbot-update/', ChatbotPatientUpdateView.as_view(), name='patient-me-chatbot-update'),
+    
+    # ViewSets
     path('', include(router.urls)),
 ]
