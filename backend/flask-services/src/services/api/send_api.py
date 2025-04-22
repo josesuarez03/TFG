@@ -20,7 +20,7 @@ def send_to_django_api(endpoint, data):
         # Configurar los headers, incluyendo el token de autenticación
         headers = {
             'Content-Type': 'application/json',
-            'Authorization': f"Bearer {os.getenv('DJANGO_API_TOKEN', '')}"
+            'Authorization': f"Bearer {Config.JWT_SECRET}"
         }
 
         sensitive_fields = ['medical_context', 'allergies', 'medications', 'medical_history']

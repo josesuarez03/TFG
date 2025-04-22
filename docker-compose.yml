@@ -54,6 +54,8 @@ services:
       - REDIS_PORT=6379
       - JWT_ALGORITHM=${JWT_ALGORITHM}
       - DJANGO_SECRET_KEY=${DJANGO_SECRET_KEY}
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY}
+      - DJANGO_API_URL=${DJANGO_API_URL}
     networks:
       - app
 
