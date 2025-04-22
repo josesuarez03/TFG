@@ -181,3 +181,5 @@ EMAIL_PORT = os.getenv('EMAIL_PORT')
 EMAIL_USE_TLS = True
 EMAIL_HOST_USER = os.getenv('EMAIL_HOST_USER')  # tu dirección de correo electrónico
 EMAIL_HOST_PASSWORD = os.getenv('EMAIL_HOST_PASSWORD')  # tu contraseña de correo electrónico
+
+FLASK_API_KEY = os.getenv('DJANGO_SECRET_KEY')
