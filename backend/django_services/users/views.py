@@ -223,70 +223,84 @@ class UserViewSet(viewsets.ModelViewSet):
             
         serializer = UserProfileSerializerBasic(users, many=True)
         return Response(serializer.data)
-
-class ChatbotPatientUpdateView(APIView):
+    
+class PatientMedicalDataUpdateView(APIView):
     """
-    Vista para que el chatbot actualice la información médica de un paciente
+    Vista unificada para recibir y procesar datos médicos
+    Utiliza autenticación JWT para mantener consistencia con el resto del sistema
+    Permite actualizar datos tanto por servicios internos como por Flask
     """
     permission_classes = [IsAuthenticated]
     
-    def post(self, request, patient_id=None):
-        # Si no se proporciona patient_id, usar el del usuario actual si es paciente
-        if not patient_id and request.user.tipo == 'patient':
-            try:
-                patient = request.user.patient
-            except Patient.DoesNotExist:
+    def post(self, request):
+        # Obtener datos de la solicitud
+        user_id = request.data.get('user_id')
+        medical_data = request.data.get('medical_data', {})
+        source = request.data.get('source', 'chatbot')
+        
+        # Si no se proporciona un user_id específico, usar el del usuario autenticado
+        if not user_id and request.user.tipo == 'patient':
+            user_id = str(request.user.id)
+        
+        if not user_id:
+            return Response(
+                {"error": "Se requiere un ID de usuario"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Verificar permisos - solo el propio usuario o un médico/admin puede actualizar datos
+        if str(request.user.id) != user_id and request.user.tipo not in ['doctor', 'admin', 'system']:
+            return Response(
+                {"error": "No tiene permisos para actualizar los datos de este paciente"},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        # Buscar usuario y su perfil de paciente
+        try:
+            user = User.objects.get(id=user_id)
+            
+            # Verificar si es paciente
+            if user.tipo != 'patient':
                 return Response(
-                    {"error": "El usuario actual no tiene un perfil de paciente"},
-                    status=status.HTTP_404_NOT_FOUND
-                )
-        else:
-            # Si se proporciona un ID o el usuario es médico/admin, verificar permisos
-            if not patient_id:
-                return Response(
-                    {"error": "Se requiere un ID de paciente"},
+                    {"error": "El usuario no es un paciente"},
                     status=status.HTTP_400_BAD_REQUEST
                 )
                 
-            # Los médicos y admin pueden actualizar cualquier paciente
-            if request.user.tipo not in ['doctor', 'admin']:
-                return Response(
-                    {"error": "No tiene permisos para actualizar este paciente"},
-                    status=status.HTTP_403_FORBIDDEN
-                )
-                
-            try:
-                patient = Patient.objects.get(id=patient_id)
-            except Patient.DoesNotExist:
-                return Response(
-                    {"error": "Paciente no encontrado"},
-                    status=status.HTTP_404_NOT_FOUND
-                )
+            # Obtener o crear perfil de paciente
+            patient, created = Patient.objects.get_or_create(user=user)
+            
+        except User.DoesNotExist:
+            return Response(
+                {"error": "Usuario no encontrado"},
+                status=status.HTTP_404_NOT_FOUND
+            )
         
-        # Validar los datos proporcionados por el chatbot
-        analysis_data = request.data.get('analysis_data', {})
-        serializer = ChatbotAnalysisSerializer(data=analysis_data)
+        # Validar los datos médicos recibidos
+        serializer = ChatbotAnalysisSerializer(data=medical_data)
         
         if not serializer.is_valid():
             return Response(
-                {"error": "Datos de análisis inválidos", "details": serializer.errors},
+                {"error": "Datos médicos inválidos", "details": serializer.errors},
                 status=status.HTTP_400_BAD_REQUEST
             )
-            
-        # Actualizar la información del paciente - ahora pasamos el usuario que realiza la actualización
+        
+        # Actualizar información del paciente con los datos validados
         updated = patient.update_from_chatbot_analysis(
-            serializer.validated_data, 
-            created_by=request.user if not request.user.is_anonymous else None
+            serializer.validated_data,
+            created_by=request.user
         )
         
         if updated:
             # Obtener la última entrada de historial creada
             latest_history = patient.history_entries.first()
             
+            # Verificar si la actualización completó el perfil del usuario
+            user.check_profile_completion()
+            
             return Response({
                 "message": "Información del paciente actualizada correctamente",
                 "patient": PatientSerializer(patient).data,
-                "profile_complete": patient.user.is_profile_completed,
+                "profile_complete": user.is_profile_completed,
                 "history_entry": PatientHistoryEntrySerializer(latest_history).data if latest_history else None
             }, status=status.HTTP_200_OK)
         else:
