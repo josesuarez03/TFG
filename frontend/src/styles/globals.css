@@ -30,7 +30,7 @@
 
     --border: 214.3 31.8% 91.4%;
     --input: 214.3 31.8% 91.4%;
-    --ring: α206 69% 47%;     /* #2583CC */
+    --ring: 206 69% 47%;     /* #2583CC */
 
     --chart-1: 206 69% 47%;   /* #2583CC */
     --chart-2: 216 23% 87%;   /* #D5DEE9 */
@@ -72,62 +72,60 @@
   }
 }
 
-/* Clases de utilidad para acceder directamente a los colores personalizados */
-@layer utilities {
-  .bg-blue-primary {
-    background-color: #2583CC;
-  }
-  .bg-gray-light {
-    background-color: #D5DEE9;
-  }
-  .bg-blue-dark {
-    background-color: #083560;
-  }
-  .bg-blue-sky {
-    background-color: #53C4F5;
-  }
-  .bg-blue-medium {
-    background-color: #7097BE;
-  }
-  .bg-blue-violet {
-    background-color: #48547C;
-  }
+/* Clases directas para los colores personalizados */
+.bg-blue-primary {
+  background-color: #2583CC;
+}
+.bg-gray-light {
+  background-color: #D5DEE9;
+}
+.bg-blue-dark {
+  background-color: #083560;
+}
+.bg-blue-sky {
+  background-color: #53C4F5;
+}
+.bg-blue-medium {
+  background-color: #7097BE;
+}
+.bg-blue-violet {
+  background-color: #48547C;
+}
 
-  .text-blue-primary {
-    color: #2583CC;
-  }
-  .text-gray-light {
-    color: #D5DEE9;
-  }
-  .text-blue-dark {
-    color: #083560;
-  }
-  .text-blue-sky {
-    color: #53C4F5;
-  }
-  .text-blue-medium {
-    color: #7097BE;
-  }
-  .text-blue-violet {
-    color: #48547C;
-  }
+.text-blue-primary {
+  color: #2583CC;
+}
+.text-gray-light {
+  color: #D5DEE9;
+}
+.text-blue-dark {
+  color: #083560;
+}
+.text-blue-sky {
+  color: #53C4F5;
+}
+.text-blue-medium {
+  color: #7097BE;
+}
+.text-blue-violet {
+  color: #48547C;
+}
 
-  .border-blue-primary {
-    border-color: #2583CC;
-  }
-  .border-gray-light {
-    border-color: #D5DEE9;
-  }
-  .border-blue-dark {
-    border-color: #083560;
-  }
-  .border-blue-sky {
-    border-color: #53C4F5;
-  }
-  .border-blue-medium {
-    border-color: #7097BE;
-  }
-  .border-blue-violet {
-    border-color: #48547C;
-  }
+.border-blue-primary {
+  border-color: #2583CC;
+}
+.border-gray-light {
+  border-color: #D5DEE9;
+}
+.border-blue-dark {
+  border-color: #083560;
+}
+.border-blue-sky {
+  border-color: #53C4F5;
+}
+.border-blue-medium {
+  border-color: #7097BE;
+}
+.border-blue-violet {
+  border-color: #48547C;
 }
