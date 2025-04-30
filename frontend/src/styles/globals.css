@@ -1,77 +1,133 @@
-@import "tailwindcss";
-
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 0 0% 3.9%;
+    --background: 210 25% 98%;
+    --foreground: 210 40% 98%;
+
     --card: 0 0% 100%;
-    --card-foreground: 0 0% 3.9%;
+    --card-foreground: 210 40% 2%;
+
     --popover: 0 0% 100%;
-    --popover-foreground: 0 0% 3.9%;
-    --primary: 0 0% 9%;
-    --primary-foreground: 0 0% 98%;
-    --secondary: 0 0% 96.1%;
-    --secondary-foreground: 0 0% 9%;
-    --muted: 0 0% 96.1%;
-    --muted-foreground: 0 0% 45.1%;
-    --accent: 0 0% 96.1%;
-    --accent-foreground: 0 0% 9%;
+    --popover-foreground: 210 40% 2%;
+
+    --primary: 206 69% 47%;  /* #2583CC */
+    --primary-foreground: 210 40% 98%;
+
+    --secondary: 216 23% 87%;  /* #D5DEE9 */
+    --secondary-foreground: 210 40% 2%;
+
+    --muted: 210 40% 96.1%;
+    --muted-foreground: 215.4 16.3% 46.9%;
+
+    --accent: 209 58% 93%;    /* Basado en un tono claro de los azules */
+    --accent-foreground: 210 40% 2%;
+
     --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 0 0% 98%;
-    --border: 0 0% 89.8%;
-    --input: 0 0% 89.8%;
-    --ring: 0 0% 3.9%;
-    --chart-1: 12 76% 61%;
-    --chart-2: 173 58% 39%;
-    --chart-3: 197 37% 24%;
-    --chart-4: 43 74% 66%;
-    --chart-5: 27 87% 67%;
+    --destructive-foreground: 210 40% 98%;
+
+    --border: 214.3 31.8% 91.4%;
+    --input: 214.3 31.8% 91.4%;
+    --ring: α206 69% 47%;     /* #2583CC */
+
+    --chart-1: 206 69% 47%;   /* #2583CC */
+    --chart-2: 216 23% 87%;   /* #D5DEE9 */
+    --chart-3: 209 77% 20%;   /* #083560 */
+    --chart-4: 195 89% 64%;   /* #53C4F5 */
+    --chart-5: 210 44% 60%;   /* #7097BE */
+
     --radius: 0.5rem;
   }
+
   .dark {
-    --background: 0 0% 3.9%;
-    --foreground: 0 0% 98%;
-    --card: 0 0% 3.9%;
-    --card-foreground: 0 0% 98%;
-    --popover: 0 0% 3.9%;
-    --popover-foreground: 0 0% 98%;
-    --primary: 0 0% 98%;
-    --primary-foreground: 0 0% 9%;
-    --secondary: 0 0% 14.9%;
-    --secondary-foreground: 0 0% 98%;
-    --muted: 0 0% 14.9%;
-    --muted-foreground: 0 0% 63.9%;
-    --accent: 0 0% 14.9%;
-    --accent-foreground: 0 0% 98%;
+    --background: 209 77% 20%; /* #083560 */
+    --foreground: 210 40% 98%;
+
+    --card: 210 40% 13%;
+    --card-foreground: 210 40% 98%;
+
+    --popover: 210 40% 13%;
+    --popover-foreground: 210 40% 98%;
+
+    --primary: 195 89% 64%;   /* #53C4F5 */
+    --primary-foreground: 209 77% 20%; /* #083560 */
+
+    --secondary: 215 46% 60%;  /* #7097BE */
+    --secondary-foreground: 210 40% 98%;
+
+    --muted: 217 33% 30%;
+    --muted-foreground: 215 20.2% 65.1%;
+
+    --accent: 217 33% 38%;    /* #48547C */
+    --accent-foreground: 210 40% 98%;
+
     --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 0 0% 98%;
-    --border: 0 0% 14.9%;
-    --input: 0 0% 14.9%;
-    --ring: 0 0% 83.1%;
-    --chart-1: 220 70% 50%;
-    --chart-2: 160 60% 45%;
-    --chart-3: 30 80% 55%;
-    --chart-4: 280 65% 60%;
-    --chart-5: 340 75% 55%;
+    --destructive-foreground: 210 40% 98%;
+
+    --border: 217 33% 25%;
+    --input: 217 33% 25%;
+    --ring: 195 89% 64%;      /* #53C4F5 */
   }
 }
 
-
-
-@layer base {
-  * {
-    @apply border-border;
+/* Clases de utilidad para acceder directamente a los colores personalizados */
+@layer utilities {
+  .bg-blue-primary {
+    background-color: #2583CC;
   }
-  body {
-    @apply bg-background text-foreground;
+  .bg-gray-light {
+    background-color: #D5DEE9;
+  }
+  .bg-blue-dark {
+    background-color: #083560;
+  }
+  .bg-blue-sky {
+    background-color: #53C4F5;
+  }
+  .bg-blue-medium {
+    background-color: #7097BE;
+  }
+  .bg-blue-violet {
+    background-color: #48547C;
+  }
+
+  .text-blue-primary {
+    color: #2583CC;
+  }
+  .text-gray-light {
+    color: #D5DEE9;
+  }
+  .text-blue-dark {
+    color: #083560;
+  }
+  .text-blue-sky {
+    color: #53C4F5;
+  }
+  .text-blue-medium {
+    color: #7097BE;
+  }
+  .text-blue-violet {
+    color: #48547C;
+  }
+
+  .border-blue-primary {
+    border-color: #2583CC;
+  }
+  .border-gray-light {
+    border-color: #D5DEE9;
+  }
+  .border-blue-dark {
+    border-color: #083560;
+  }
+  .border-blue-sky {
+    border-color: #53C4F5;
+  }
+  .border-blue-medium {
+    border-color: #7097BE;
+  }
+  .border-blue-violet {
+    border-color: #48547C;
   }
 }
