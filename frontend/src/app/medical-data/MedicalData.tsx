@@ -323,7 +323,7 @@ export default function MedicalData() {
                 </CardContent>
                 <CardFooter className="flex justify-center pt-2">
                     <Button
-                        onClick={() => router.push('/dashboard/medical-history')}
+                        onClick={() => router.push(ROUTES.PROTECTED.MEDICAL_DATA + '/history')}
                         className="flex items-center gap-2"
                     >
                         <TbHistory className="h-4 w-4" />
