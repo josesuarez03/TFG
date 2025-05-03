@@ -6,7 +6,7 @@ import requests
 from datetime import datetime
 from services.chatbot.comprehend_medical import detect_entities
 from services.chatbot.bedrock_claude import call_claude
-from services.api.send_api import send_to_django_api
+from services.api.send_api import send_data_to_django
 
 logger = logging.getLogger(__name__)
 
@@ -209,7 +209,7 @@ class MedicalDataProcessor:
             }
             
             # Send data to Django API
-            response = send_to_django_api('/api/patients/update_medical_data/', django_data)
+            response = send_data_to_django('/api/patients/update_medical_data/', django_data)
             
             return response
         except Exception as e:
