@@ -18,6 +18,8 @@ export interface UserProfile {
     allergies?: string;
     medications?: string;
     medical_history?: string;
+    is_data_validate?: boolean;
+    data_validated_at?: string;
   };
   doctor?: {
     especialidad?: string;
