@@ -87,7 +87,7 @@ class Config:
     # Configuración Redis - usar nombres de host de Docker si estamos en contenedores
     REDIS_HOST = os.getenv("REDIS_HOST")
     REDIS_PORT = int(os.getenv("REDIS_PORT"))
-    REDIS_DB = int(os.getenv("REDIS_DB"))
+    REDIS_DB = int(os.getenv("REDIS_DB", "0"))
 
     # Usar la clave secreta de Django si está disponible
     JWT_SECRET = DJANGO_SECRET_KEY or os.getenv("JWT_SECRET")

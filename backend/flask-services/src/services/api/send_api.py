@@ -7,7 +7,7 @@ from config.config import Config
 
 logger = logging.getLogger(__name__)
 
-def send_to_django_api(user_id, medical_data):
+def send_data_to_django(user_id, medical_data):
 
     # URL de la API de Django
     django_api_url = os.getenv('DJANGO_API_URL')
