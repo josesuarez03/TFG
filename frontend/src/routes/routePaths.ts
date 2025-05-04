@@ -1,9 +1,12 @@
+
+
 export const ROUTES = {
     // Public routes
     PUBLIC: {
       LOGIN: '/auth/login',
       REGISTER: '/auth/register',
       PROFILE_TYPE: '/auth/profile-type',
+      COMPLETE_PROFILE: '/auth/complete-profile',
       RECOVER_PASSWORD: '/auth/recover-password',
       VERIFY_CODE: '/auth/verify-code',
     },
