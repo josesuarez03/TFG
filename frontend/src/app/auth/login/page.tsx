@@ -90,7 +90,7 @@ export default function Login() {
           <CardHeader>
             <CardTitle className="text-center">
                 <Image
-                    src="/logo.png"
+                    src="/assets/img/logo.png"
                     alt="Logo"
                     width={100}
                     height={100}

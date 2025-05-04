@@ -29,7 +29,7 @@ export default function ProfileType() {
         <div className="container mx-auto max-w-3xl py-12 px-4">
             <div className="text-center mb-10">
                 <Image
-                    src="/logo.png"
+                    src="/assets/img/logo.png"
                     alt="Logo"
                     width={120}
                     height={120}

@@ -1,3 +1,5 @@
+"use client"
+
 import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
 import Link from 'next/link';
@@ -144,7 +146,7 @@ export default function Register() {
           <CardHeader>
             <CardTitle className="text-center">
                 <Image
-                    src="/logo.png"
+                    src="//assets/img/logo.png"
                     alt="Logo"
                     width={100}
                     height={100}
