@@ -11,7 +11,6 @@ export const ROUTES = {
     // Protected routes
     PROTECTED: {
       DASHBOARD: '/dashboard',
-      HOME: '/home',
       PROFILE: '/profile',
       PROFILE_COMPLETE: '/profile/complete',
       PROFILE_EDIT: '/profile/edit',
