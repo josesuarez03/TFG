@@ -5,8 +5,10 @@ export const redirectToLogin = () => {
     Router.push('/auth/login'); 
 };
 
+const BASEURL = 'http://localhost/api/';
+
 const API = axios.create({
-    baseURL: 'https://api.medichecks.com/api/',
+    baseURL: BASEURL,
     withCredentials: true,
     headers: {
         'Content-Type': 'application/json',
@@ -38,7 +40,7 @@ API.interceptors.response.use(
                 const refreshToken = localStorage.getItem('refresh_token');
                 if (refreshToken) {
                     const response = await axios.post(
-                        'https://api.medichecks.com/api/token/refresh/',
+                        `${BASEURL}token/refresh-token/`,	
                         { refresh: refreshToken },
                         { headers: { 'Content-Type': 'application/json' } }
                     );

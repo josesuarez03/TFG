@@ -29,6 +29,10 @@ export function middleware(request: NextRequest) {
   const loginPath = ROUTES.PUBLIC.LOGIN;
   const isLoginPage = pathname === loginPath;
   
+  // Profile type selection path
+  const profileTypePath = ROUTES.PUBLIC.PROFILE_TYPE;
+  const isProfileTypePage = pathname === profileTypePath;
+  
   // Root path handling - let client-side handle this to avoid redirect loops
   if (pathname === '/') {
     // For the root path, we'll let ContentLayout handle it
@@ -36,22 +40,14 @@ export function middleware(request: NextRequest) {
     return NextResponse.next();
   }
   
-  // Allow direct access to login page without parameters
-  if (isLoginPage && !request.nextUrl.search) {
-    return NextResponse.next();
-  }
-  
-  // Prevent circular redirects for login page with "from" parameter
-  if (isLoginPage) {
-    const fromParam = request.nextUrl.searchParams.get('from');
-    
-    // If fromParam is login page or doesn't exist, remove the parameter
-    if (!fromParam || fromParam === loginPath || fromParam.startsWith(`${loginPath}?`)) {
-      const cleanUrl = new URL(loginPath, request.url);
-      return NextResponse.redirect(cleanUrl);
+  // Allow direct access to specific public pages without authentication
+  if (isLoginPage || isProfileTypePage || pathname === ROUTES.PUBLIC.REGISTER) {
+    // Handle the specific case of profile type selection path
+    if (pathname === ROUTES.PUBLIC.REGISTER && !request.nextUrl.searchParams.get('type')) {
+      // If register page is accessed without a type parameter, redirect to profile type selection
+      return NextResponse.redirect(new URL(profileTypePath, request.url));
     }
     
-    // Otherwise, allow normal access
     return NextResponse.next();
   }
   

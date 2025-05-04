@@ -71,6 +71,7 @@ export default function Register() {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [googleError, setGoogleError] = useState<string | null>(null);
+    const [googleLoginButtonRef, setGoogleLoginButtonRef] = useState<HTMLDivElement | null>(null);
     
     const { register, handleSubmit, formState: { errors }, setValue } = useForm<RegisterFormInputs>({
         resolver: zodResolver(registerSchema),
@@ -79,18 +80,16 @@ export default function Register() {
         }
     });
 
-    // Establecer el tipo de usuario basado en la URL o localStorage
+    // Verificar si hay un tipo en la URL y redirigir si no existe
     useEffect(() => {
-        const profileType = type || localStorage.getItem('selectedProfileType') || 'patient';
-        setValue('tipo', profileType);
-    }, [type, setValue]);
-
-    // Redirigir si no hay tipo de perfil seleccionado
-    useEffect(() => {
-        if (!type && !localStorage.getItem('selectedProfileType')) {
-            router.push('/auth/profile-type');
+        if (!type) {
+            router.push(ROUTES.PUBLIC.PROFILE_TYPE);
+        } else {
+            // Guardar en localStorage cuando haya un tipo válido
+            localStorage.setItem('selectedProfileType', type);
+            setValue('tipo', type);
         }
-    }, [type, router]);
+    }, [type, router, setValue]);
 
     const onSubmit = async (data: RegisterFormInputs) => {
         try {
@@ -122,8 +121,8 @@ export default function Register() {
 
         try {
             setGoogleError(null);
-            // Pasar el tipo de usuario seleccionado en la solicitud de Google
-            const profileType = type || localStorage.getItem('selectedProfileType') || 'patient';
+            // Obtener el tipo de usuario actual y pasarlo a loginWithGoogle
+            const profileType = type || 'patient';
             await loginWithGoogle(credentialResponse.credential, profileType);
         } catch (err) {
             console.error("Error con Google login:", err);
@@ -136,13 +135,9 @@ export default function Register() {
         setGoogleError("Error al iniciar sesión con Google. Por favor intenta nuevamente.");
     };
 
-    // Determinar el origin actual para la redirección
-    const origin = typeof window !== 'undefined' ? window.location.origin : '';
-
     // Mostrar texto basado en el tipo de usuario
     const getUserTypeText = () => {
-        const userType = type || localStorage.getItem('selectedProfileType');
-        return userType === 'doctor' ? 'Médico' : 'Paciente';
+        return type === 'doctor' ? 'Médico' : 'Paciente';
     };
 
     return (
@@ -176,29 +171,24 @@ export default function Register() {
                 </Alert>
             )}
           
-            {/* Botón de Google con el proveedor directamente aquí */}
+            {/* Botón de Google con el proveedor correctamente configurado */}
             <GoogleOAuthProvider 
                 clientId={process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || ''}
-                // Usa redirect_uri explícitamente si es necesario
-                // ↓ Descomentar y ajustar si sigues teniendo problemas
-                // onScriptLoadError={(error) => console.error("Script load error:", error)}
             >
                 <div className="mb-4">
                     <Button 
                         type="button"
                         className="w-full flex items-center justify-center space-x-2 bg-white hover:bg-gray-100 text-gray-800 border border-gray-300"
                         onClick={() => {
-                            // Buscar el botón de Google por su atributo y hacer clic en él
-                            const googleButtons = document.querySelectorAll('button');
-                            const googleLoginButton = Array.from(googleButtons).find(
-                                button => button.textContent?.includes('Iniciar sesión con Google') ||
-                                         button.textContent?.includes('Sign in with Google')
-                            );
-                            
-                            if (googleLoginButton) {
-                                googleLoginButton.click();
+                            if (googleLoginButtonRef) {
+                                // Trigger the hidden Google button's click event
+                                const buttons = googleLoginButtonRef.querySelectorAll('button');
+                                if (buttons && buttons.length > 0) {
+                                    buttons[0].click();
+                                } else {
+                                    setGoogleError("Error al iniciar sesión con Google. Por favor intenta nuevamente.");
+                                }
                             } else {
-                                console.error("No se encontró el botón de Google");
                                 setGoogleError("Error al iniciar botón de Google. Inténtalo nuevamente.");
                             }
                         }}
@@ -207,7 +197,7 @@ export default function Register() {
                         <span>Registrarse con Google</span>
                     </Button>
                     
-                    <div style={{ marginTop: '10px' }}>
+                    <div ref={setGoogleLoginButtonRef} style={{ display: 'none' }}>
                         <GoogleLogin
                             onSuccess={handleGoogleSuccess}
                             onError={handleGoogleError}

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
@@ -42,7 +42,8 @@ export default function Login() {
     const { register, handleSubmit, formState: { errors } } = useForm<LoginFormInputs>({
         resolver: zodResolver(loginSchema)
     });
-    const [googleError, setGoogleError] = React.useState<string | null>(null);
+    const [googleError, setGoogleError] = useState<string | null>(null);
+    const [googleLoginButtonRef, setGoogleLoginButtonRef] = useState<HTMLDivElement | null>(null);
 
     // Redireccionar si el usuario ya está autenticado
     useEffect(() => {
@@ -70,7 +71,9 @@ export default function Login() {
 
         try {
             setGoogleError(null);
-            await loginWithGoogle(credentialResponse.credential);
+            // Obtener el tipo de perfil del localStorage (si existe)
+            const profileType = localStorage.getItem('selectedProfileType') || 'patient';
+            await loginWithGoogle(credentialResponse.credential, profileType);
         } catch (err) {
             console.error("Error con Google login:", err);
             setGoogleError("Error al iniciar sesión con Google. Por favor intenta nuevamente.");
@@ -106,7 +109,7 @@ export default function Login() {
               </Alert>
             )}
             
-            {/* Botón de Google con el proveedor directamente aquí */}
+            {/* Botón de Google con el proveedor correctamente configurado */}
             <GoogleOAuthProvider 
                 clientId={process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || ''}
             >
@@ -115,17 +118,15 @@ export default function Login() {
                         type="button"
                         className="w-full flex items-center justify-center space-x-2 bg-white hover:bg-gray-100 text-gray-800 border border-gray-300"
                         onClick={() => {
-                            // Buscar el botón de Google por su atributo y hacer clic en él
-                            const googleButtons = document.querySelectorAll('button');
-                            const googleLoginButton = Array.from(googleButtons).find(
-                                button => button.textContent?.includes('Iniciar sesión con Google') ||
-                                        button.textContent?.includes('Sign in with Google')
-                            );
-                            
-                            if (googleLoginButton) {
-                                googleLoginButton.click();
+                            if (googleLoginButtonRef) {
+                                // Trigger the hidden Google button directly
+                                const buttons = googleLoginButtonRef.querySelectorAll('button');
+                                if (buttons && buttons.length > 0) {
+                                    buttons[0].click();
+                                } else {
+                                    setGoogleError("Error al iniciar sesión con Google. Por favor intenta nuevamente.");
+                                }
                             } else {
-                                console.error("No se encontró el botón de Google");
                                 setGoogleError("Error al iniciar botón de Google. Inténtalo nuevamente.");
                             }
                         }}
@@ -134,7 +135,7 @@ export default function Login() {
                         <span>Iniciar sesión con Google</span>
                     </Button>
                     
-                    <div style={{ marginTop: '10px' }}>
+                    <div ref={setGoogleLoginButtonRef} style={{ display: 'none' }}>
                         <GoogleLogin
                             onSuccess={handleGoogleSuccess}
                             onError={handleGoogleError}
@@ -170,7 +171,7 @@ export default function Login() {
                   <Input type="password" {...register('password')} />
                     {errors.password && <p className="text-red-500 text-sm">{errors.password.message}</p>}
                   <Link 
-                      href={ROUTES.PUBLIC.RECOVER_PASSWORD} 
+                      href={`${ROUTES.PUBLIC.RECOVER_PASSWORD}?fromLogin=true`}
                       className="absolute right-0 top-0 text-sm text-blue-500 hover:underline mt-1"
                   >
                       ¿Olvidaste tu contraseña?
@@ -194,7 +195,7 @@ export default function Login() {
           <CardFooter className="text-center">
               <p className="flex items-center justify-center">
                 ¿No tienes cuenta? 
-                <Link href={ROUTES.PUBLIC.REGISTER} className="text-blue-500 hover:underline ml-2 flex items-center">
+                <Link href={ROUTES.PUBLIC.PROFILE_TYPE} className="text-blue-500 hover:underline ml-2 flex items-center">
                   <TbUser className="w-4 h-4 mr-1" />
                   <span>Regístrate</span>
                 </Link>
