@@ -82,15 +82,18 @@ export function useAuth() {
   };
 
   // Handle Google login
-  const loginWithGoogle = async (token: string): Promise<void> => {
+  const loginWithGoogle = async (token: string, profileType?: string): Promise<void> => {
     setLoading(true);
     setError(null);
 
     try {
-      const profileType = localStorage.getItem('selectedProfileType') || 'patient';
-      const response = await API.post<LoginResponse>("auth/google/", { 
+      // Get profile type from parameter or localStorage
+      const tipo = profileType || localStorage.getItem('selectedProfileType') || 'patient';
+      
+      // Make API request with both token and tipo
+      const response = await API.post<LoginResponse>("google/login/", { 
         token,
-        tipo: profileType
+        tipo
       });
       
       const { access, refresh } = response.data;

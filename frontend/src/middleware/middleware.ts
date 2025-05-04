@@ -3,100 +3,103 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { ROUTES } from '@/routes/routePaths';
 
-// Comprueba si una ruta comienza con cualquiera de las rutas en el objeto
-const pathStartsWith = (path: string, routeMap: Record<string, string>): boolean => {
-  return Object.values(routeMap).some(route => path.startsWith(route));
+// Checks if a path exactly matches or starts with any route in the object
+const pathMatches = (path: string, routeMap: Record<string, string>): boolean => {
+  return Object.values(routeMap).some(route => 
+    path === route || path.startsWith(`${route}/`) || 
+    (path.startsWith(route) && path.charAt(route.length) === '?')
+  );
 };
 
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
   
-  // Verifica las cookies de autenticación
+  // Check authentication cookies
   const authCookie = request.cookies.get('isAuthenticated')?.value;
   const userTypeCookie = request.cookies.get('userType')?.value;
   const profileCompletedCookie = request.cookies.get('isProfileCompleted')?.value;
   
-  // Verifica cookies del flujo de recuperación de contraseña
+  // Check password recovery flow cookies
   const recoveryInitiatedCookie = request.cookies.get('recoveryInitiated')?.value;
   const recoveryEmailSentCookie = request.cookies.get('recoveryEmailSent')?.value;
   
   const isAuthenticated = authCookie === 'true';
   
-  // Verifica si estamos en la página de login basada en la estructura app/auth/login
-  const loginPath = '/auth/login';
+  // Define login path based on routes configuration
+  const loginPath = ROUTES.PUBLIC.LOGIN;
   const isLoginPage = pathname === loginPath;
   
-  // Manejo de la ruta raíz
+  // Root path handling - let client-side handle this to avoid redirect loops
   if (pathname === '/') {
-    return isAuthenticated 
-      ? NextResponse.redirect(new URL(ROUTES.PROTECTED.DASHBOARD, request.url))
-      : NextResponse.redirect(new URL(loginPath, request.url));
+    // For the root path, we'll let ContentLayout handle it
+    // This prevents potential conflicts between middleware and client-side redirects
+    return NextResponse.next();
   }
   
-  // Permitir acceso directo a la página de login sin parámetros
+  // Allow direct access to login page without parameters
   if (isLoginPage && !request.nextUrl.search) {
     return NextResponse.next();
   }
   
-  // Prevenir redirección circular para la página de login con parámetro "from"
+  // Prevent circular redirects for login page with "from" parameter
   if (isLoginPage) {
     const fromParam = request.nextUrl.searchParams.get('from');
     
-    // Si fromParam es la página de login o no existe, eliminamos el parámetro
+    // If fromParam is login page or doesn't exist, remove the parameter
     if (!fromParam || fromParam === loginPath || fromParam.startsWith(`${loginPath}?`)) {
       const cleanUrl = new URL(loginPath, request.url);
       return NextResponse.redirect(cleanUrl);
     }
     
-    // En cualquier otro caso, permitimos el acceso normal
+    // Otherwise, allow normal access
     return NextResponse.next();
   }
   
-  // Manejo del flujo de recuperación de contraseña
-  const recoverPasswordPath = '/auth/recover-password';
-  const verifyCodePath = '/auth/verify-code';
+  // Handle password recovery flow
+  const recoverPasswordPath = ROUTES.PUBLIC.RECOVER_PASSWORD;
+  const verifyCodePath = ROUTES.PUBLIC.VERIFY_CODE;
   const isRecoverPasswordPath = pathname === recoverPasswordPath;
   const isVerifyCodePath = pathname === verifyCodePath;
   
   if (isRecoverPasswordPath || isVerifyCodePath) {
-    // Para recover-password, verificar si viene de login o ya está en el flujo
+    // For recover-password, verify if coming from login or already in flow
     if (isRecoverPasswordPath && !recoveryInitiatedCookie) {
       const fromLogin = request.nextUrl.searchParams.get('fromLogin');
       if (fromLogin !== 'true') {
-        // Si no viene de login y no se ha iniciado el flujo de recuperación, redirigir a login
+        // If not from login and recovery flow not initiated, redirect to login
         return NextResponse.redirect(new URL(loginPath, request.url));
       }
     }
     
-    // Para verify-code, verificar si se completó recover-password
+    // For verify-code, check if recover-password completed
     if (isVerifyCodePath && !recoveryEmailSentCookie) {
-      // Si no se envió email (recover-password no completado), redirigir a recover-password
+      // If email not sent (recover-password not completed), redirect to recover-password
       return NextResponse.redirect(new URL(recoverPasswordPath, request.url));
     }
     
-    // Permitir acceso a las páginas de recuperación de contraseña si se cumplen las condiciones
+    // Allow access to password recovery pages if conditions met
     return NextResponse.next();
   }
   
-  // Usuario no autenticado intentando acceder a ruta protegida
+  // Unauthenticated user trying to access protected route
   if (!isAuthenticated && 
-      (pathStartsWith(pathname, ROUTES.PROTECTED) || pathStartsWith(pathname, ROUTES.DOCTOR))) {
+      (pathMatches(pathname, ROUTES.PROTECTED) || pathMatches(pathname, ROUTES.DOCTOR))) {
     const url = new URL(loginPath, request.url);
     url.searchParams.set('from', pathname);
     return NextResponse.redirect(url);
   }
   
-  // Usuario autenticado intentando acceder a rutas públicas (como login/registro)
-  if (isAuthenticated && pathStartsWith(pathname, ROUTES.PUBLIC)) {
+  // Authenticated user trying to access public routes (like login/register)
+  if (isAuthenticated && pathMatches(pathname, ROUTES.PUBLIC)) {
     return NextResponse.redirect(new URL(ROUTES.PROTECTED.DASHBOARD, request.url));
   }
   
-  // Manejo de rutas específicas para doctores
-  if (isAuthenticated && pathStartsWith(pathname, ROUTES.DOCTOR) && userTypeCookie !== 'doctor') {
+  // Handle doctor-specific routes
+  if (isAuthenticated && pathMatches(pathname, ROUTES.DOCTOR) && userTypeCookie !== 'doctor') {
     return NextResponse.redirect(new URL(ROUTES.PROTECTED.DASHBOARD, request.url));
   }
   
-  // Verificación de completitud del perfil
+  // Check profile completion
   if (isAuthenticated && pathname !== ROUTES.PROTECTED.PROFILE_COMPLETE && 
       profileCompletedCookie === 'false') {
     return NextResponse.redirect(new URL(ROUTES.PROTECTED.PROFILE_COMPLETE, request.url));
@@ -105,7 +108,7 @@ export function middleware(request: NextRequest) {
   return NextResponse.next();
 }
 
-// Configurar el middleware para ejecutarse en todas las rutas excepto assets estáticos y rutas API
+// Configure middleware to run on all routes except static assets and API routes
 export const config = {
   matcher: [
     '/((?!_next/static|_next/image|favicon.ico|public|api).*)',

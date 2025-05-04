@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { useRouter } from 'next/router';
+import { useRouter, useSearchParams } from 'next/navigation'; // Cambiado de next/router a next/navigation
 import API from '@/services/api';
 import { useApiError } from '@/hooks/useApiError';
 // Importar los iconos de Tabler
@@ -52,7 +52,13 @@ type ResetPasswordInputs = z.infer<typeof resetPasswordSchema>;
 
 export default function RecoverPassword() {
   const router = useRouter();
-  const { email, code, verified } = router.query;
+  const searchParams = useSearchParams(); // Usar searchParams en lugar de router.query
+  
+  // Obtener parámetros de la URL
+  const email = searchParams.get('email');
+  const code = searchParams.get('code');
+  const verified = searchParams.get('verified');
+  
   const [mode, setMode] = useState<'request' | 'reset'>(verified === 'true' ? 'reset' : 'request');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
@@ -67,7 +73,7 @@ export default function RecoverPassword() {
   const resetForm = useForm<ResetPasswordInputs>({
     resolver: zodResolver(resetPasswordSchema),
     defaultValues: {
-      code: Array.isArray(code) ? code[0] : code || '',
+      code: code || '',
     }
   });
 
@@ -75,7 +81,7 @@ export default function RecoverPassword() {
   useEffect(() => {
     if (email && code && verified === 'true') {
       setMode('reset');
-      resetForm.setValue('code', Array.isArray(code) ? code[0] : code || '');
+      resetForm.setValue('code', code || '');
     }
   }, [email, code, verified, resetForm]);
 
@@ -91,10 +97,7 @@ export default function RecoverPassword() {
       });
 
       // En lugar de mostrar un mensaje, redirigir directamente a VerifyCode
-      router.push({
-        pathname: ROUTES.PUBLIC.VERIFY_CODE,
-        query: { email: data.email }
-      });
+      router.push(`${ROUTES.PUBLIC.VERIFY_CODE}?email=${data.email}`);
     } catch (err) {
       handleApiError(err);
     } finally {
@@ -116,7 +119,7 @@ export default function RecoverPassword() {
     try {
       // Actualizar para usar la ruta correcta de la API y el formato correcto
       await API.post('password/reset/verify/', {
-        email: Array.isArray(email) ? email[0] : email,
+        email: email,
         code: data.code,
         new_password: data.password
       });

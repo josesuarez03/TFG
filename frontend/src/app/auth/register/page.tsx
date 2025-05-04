@@ -1,7 +1,7 @@
 "use client"
 
 import React, { useEffect, useState } from 'react';
-import { useRouter } from 'next/router';
+import { useSearchParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
 import { useAuth } from '@/hooks/useAuth';
@@ -64,22 +64,25 @@ type RegisterFormInputs = z.infer<typeof registerSchema>;
 
 export default function Register() {
     const router = useRouter();
+    const searchParams = useSearchParams();
+    const type = searchParams.get('type');
+    
     const { login, loginWithGoogle, error: authError, loading: authLoading } = useAuth();
-    const { type } = router.query;
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [googleError, setGoogleError] = useState<string | null>(null);
     
     const { register, handleSubmit, formState: { errors }, setValue } = useForm<RegisterFormInputs>({
         resolver: zodResolver(registerSchema),
         defaultValues: {
-            tipo: typeof type === 'string' ? type : 'patient'
+            tipo: type || 'patient'
         }
     });
 
     // Establecer el tipo de usuario basado en la URL o localStorage
     useEffect(() => {
         const profileType = type || localStorage.getItem('selectedProfileType') || 'patient';
-        setValue('tipo', typeof profileType === 'string' ? profileType : 'patient');
+        setValue('tipo', profileType);
     }, [type, setValue]);
 
     // Redirigir si no hay tipo de perfil seleccionado
@@ -118,26 +121,27 @@ export default function Register() {
         if (!credentialResponse.credential) return;
 
         try {
+            setGoogleError(null);
             // Pasar el tipo de usuario seleccionado en la solicitud de Google
             const profileType = type || localStorage.getItem('selectedProfileType') || 'patient';
-            await loginWithGoogle(credentialResponse.credential);
+            await loginWithGoogle(credentialResponse.credential, profileType);
         } catch (err) {
             console.error("Error con Google login:", err);
+            setGoogleError("Error al iniciar sesión con Google. Por favor intenta nuevamente.");
         }
     };
 
-    const googleButtonRef = React.useRef<HTMLDivElement>(null);
-    
-    const triggerGoogleLogin = () => {
-        const googleButton = googleButtonRef.current?.querySelector('button');
-        if (googleButton) {
-            googleButton.click();
-        }
+    const handleGoogleError = () => {
+        console.log('Error con Google login');
+        setGoogleError("Error al iniciar sesión con Google. Por favor intenta nuevamente.");
     };
+
+    // Determinar el origin actual para la redirección
+    const origin = typeof window !== 'undefined' ? window.location.origin : '';
 
     // Mostrar texto basado en el tipo de usuario
     const getUserTypeText = () => {
-        const userType = typeof type === 'string' ? type : localStorage.getItem('selectedProfileType');
+        const userType = type || localStorage.getItem('selectedProfileType');
         return userType === 'doctor' ? 'Médico' : 'Paciente';
     };
 
@@ -146,14 +150,14 @@ export default function Register() {
           <CardHeader>
             <CardTitle className="text-center">
                 <Image
-                    src="//assets/img/logo.png"
+                    src="/assets/img/logo.png"
                     alt="Logo"
                     width={100}
                     height={100}
                     className="mx-auto mb-4"
                 />
                 <div className="flex items-center justify-center">
-                    {typeof type === 'string' && type === 'doctor' ? (
+                    {type === 'doctor' ? (
                         <TbUserCircle className="w-6 h-6 mr-2 text-blue-500" />
                     ) : (
                         <TbUsers className="w-6 h-6 mr-2 text-blue-500" />
@@ -163,36 +167,64 @@ export default function Register() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            {(authError || error) && (
+            {(authError || error || googleError) && (
                 <Alert variant="destructive" className="mb-4">
                     <AlertDescription className="flex items-center">
                         <TbAlertTriangle className="w-5 h-5 mr-2" />
-                        <span>{authError || error}</span>
+                        <span>{authError || error || googleError}</span>
                     </AlertDescription>
                 </Alert>
             )}
           
-            {/* Botón de Google personalizado */}
-            <Button 
-                onClick={triggerGoogleLogin} 
-                className="w-full flex items-center justify-center space-x-2 bg-white hover:bg-gray-100 text-gray-800 border border-gray-300 mb-4"
-                >
-                <TbBrandGoogle className="w-5 h-5" />
-                <span>Registrarse con Google</span>
-            </Button>
-                      
-            {/* Botón de Google real (oculto) */}
-            <div ref={googleButtonRef} className="hidden">
-                <GoogleOAuthProvider clientId={process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || ''}>
-                <GoogleLogin
-                    onSuccess={handleGoogleSuccess}
-                    onError={() => console.log('Error con Google')}
-                    useOneTap
-                    type="icon"
-                    size="medium"
-                    />
-                </GoogleOAuthProvider>
-            </div>
+            {/* Botón de Google con el proveedor directamente aquí */}
+            <GoogleOAuthProvider 
+                clientId={process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || ''}
+                // Usa redirect_uri explícitamente si es necesario
+                // ↓ Descomentar y ajustar si sigues teniendo problemas
+                // onScriptLoadError={(error) => console.error("Script load error:", error)}
+            >
+                <div className="mb-4">
+                    <Button 
+                        type="button"
+                        className="w-full flex items-center justify-center space-x-2 bg-white hover:bg-gray-100 text-gray-800 border border-gray-300"
+                        onClick={() => {
+                            // Buscar el botón de Google por su atributo y hacer clic en él
+                            const googleButtons = document.querySelectorAll('button');
+                            const googleLoginButton = Array.from(googleButtons).find(
+                                button => button.textContent?.includes('Iniciar sesión con Google') ||
+                                         button.textContent?.includes('Sign in with Google')
+                            );
+                            
+                            if (googleLoginButton) {
+                                googleLoginButton.click();
+                            } else {
+                                console.error("No se encontró el botón de Google");
+                                setGoogleError("Error al iniciar botón de Google. Inténtalo nuevamente.");
+                            }
+                        }}
+                    >
+                        <TbBrandGoogle className="w-5 h-5" />
+                        <span>Registrarse con Google</span>
+                    </Button>
+                    
+                    <div style={{ marginTop: '10px' }}>
+                        <GoogleLogin
+                            onSuccess={handleGoogleSuccess}
+                            onError={handleGoogleError}
+                            useOneTap={false}
+                            auto_select={false}
+                            theme="outline"
+                            text="signin_with"
+                            shape="rectangular"
+                            size="large"
+                            locale="es"
+                            ux_mode="popup"
+                            context="signup"
+                        />
+                    </div>
+                </div>
+            </GoogleOAuthProvider>
+            
             <Separator className="my-4" />
 
             <form onSubmit={handleSubmit(onSubmit)} className='space-y-4'>
@@ -248,7 +280,6 @@ export default function Register() {
                         </>
                     ) : (
                         <>
-                            <TbUserCircle className="h-5 w-5 mr-2" />
                             <span>Registrarse</span>
                         </>
                     )}

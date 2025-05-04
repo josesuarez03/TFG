@@ -1,7 +1,7 @@
 "use client"
 
 import React, { useEffect, useState } from 'react';
-import { useRouter } from 'next/router';
+import { useRouter } from 'next/navigation'; // Cambiado de next/router a next/navigation
 import Image from 'next/image';
 import { useAuth } from '@/hooks/useAuth';
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
@@ -131,7 +131,7 @@ export default function CompleteProfile() {
                     <AlertDescription>
                         Debes iniciar sesión para completar tu perfil.
                         <Button
-                            onClick={() => router.push({ pathname: ROUTES.PUBLIC.LOGIN })}
+                            onClick={() => router.push(ROUTES.PUBLIC.LOGIN)}
                             className="ml-4"
                         >
                             Iniciar Sesión

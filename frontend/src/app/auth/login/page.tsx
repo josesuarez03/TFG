@@ -15,7 +15,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { TbMail, TbLock, TbUser, TbBrandGoogle, TbLoader } from 'react-icons/tb';
+import { TbMail, TbLock, TbUser, TbBrandGoogle, TbLoader, TbAlertTriangle, TbLogin } from 'react-icons/tb';
 import { ROUTES } from '@/routes/routePaths';
 
 const loginSchema = z.object({
@@ -42,6 +42,7 @@ export default function Login() {
     const { register, handleSubmit, formState: { errors } } = useForm<LoginFormInputs>({
         resolver: zodResolver(loginSchema)
     });
+    const [googleError, setGoogleError] = React.useState<string | null>(null);
 
     // Redireccionar si el usuario ya está autenticado
     useEffect(() => {
@@ -68,21 +69,17 @@ export default function Login() {
         if (!credentialResponse.credential) return;
 
         try {
+            setGoogleError(null);
             await loginWithGoogle(credentialResponse.credential);
         } catch (err) {
             console.error("Error con Google login:", err);
+            setGoogleError("Error al iniciar sesión con Google. Por favor intenta nuevamente.");
         }
     };
-    
-    // Referencia para el botón de Google OAuth nativo (oculto)
-    const googleButtonRef = React.useRef<HTMLDivElement>(null);
 
-    // Función para hacer clic en el botón de Google oculto
-    const triggerGoogleLogin = () => {
-        const googleButton = googleButtonRef.current?.querySelector('button');
-        if (googleButton) {
-            googleButton.click();
-        }
+    const handleGoogleError = () => {
+        console.log('Error con Google login');
+        setGoogleError("Error al iniciar sesión con Google. Por favor intenta nuevamente.");
     };
 
     return (
@@ -100,23 +97,74 @@ export default function Login() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            {authError && (
+            {(authError || googleError) && (
               <Alert variant="destructive" className="mb-4">
-                <AlertDescription>{authError}</AlertDescription>
+                <AlertDescription className="flex items-center">
+                    <TbAlertTriangle className="w-5 h-5 mr-2" />
+                    <span>{authError || googleError}</span>
+                </AlertDescription>
               </Alert>
             )}
+            
+            {/* Botón de Google con el proveedor directamente aquí */}
+            <GoogleOAuthProvider 
+                clientId={process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || ''}
+            >
+                <div className="mb-4">
+                    <Button 
+                        type="button"
+                        className="w-full flex items-center justify-center space-x-2 bg-white hover:bg-gray-100 text-gray-800 border border-gray-300"
+                        onClick={() => {
+                            // Buscar el botón de Google por su atributo y hacer clic en él
+                            const googleButtons = document.querySelectorAll('button');
+                            const googleLoginButton = Array.from(googleButtons).find(
+                                button => button.textContent?.includes('Iniciar sesión con Google') ||
+                                        button.textContent?.includes('Sign in with Google')
+                            );
+                            
+                            if (googleLoginButton) {
+                                googleLoginButton.click();
+                            } else {
+                                console.error("No se encontró el botón de Google");
+                                setGoogleError("Error al iniciar botón de Google. Inténtalo nuevamente.");
+                            }
+                        }}
+                    >
+                        <TbBrandGoogle className="w-5 h-5" />
+                        <span>Iniciar sesión con Google</span>
+                    </Button>
+                    
+                    <div style={{ marginTop: '10px' }}>
+                        <GoogleLogin
+                            onSuccess={handleGoogleSuccess}
+                            onError={handleGoogleError}
+                            useOneTap={false}
+                            auto_select={false}
+                            theme="outline"
+                            text="signin_with"
+                            shape="rectangular"
+                            size="large"
+                            locale="es"
+                            ux_mode="popup"
+                        />
+                    </div>
+                </div>
+            </GoogleOAuthProvider>
+            
+            <Separator className="my-4" />
+            
             <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
               <div>
-                <Label>
-                  <TbMail className="w-5 h-5 inline-block mr-2 text-gray-500" />
+                <Label className="flex items-center">
+                  <TbMail className="w-5 h-5 mr-2 text-gray-500" />
                   Email
                 </Label>
                 <Input type="email" {...register('email')} />
                 {errors.email && <p className="text-red-500 text-sm">{errors.email.message}</p>}
               </div>
               <div className="relative">
-                  <Label>
-                      <TbLock className="w-5 h-5 inline-block mr-2 text-gray-500" />
+                  <Label className="flex items-center">
+                      <TbLock className="w-5 h-5 mr-2 text-gray-500" />
                       Contraseña
                   </Label>
                   <Input type="password" {...register('password')} />
@@ -136,38 +184,21 @@ export default function Login() {
                     </div>
                   ) : (
                     <>
-                      <TbUser className="w-5 h-5 text-white" />
+                      <TbLogin className="w-5 h-5 text-white" />
                       <span>Ingresar</span>
                     </>
                   )}
                 </Button>
             </form>
-            <Separator className="my-4" />
-            
-            {/* Botón de Google personalizado */}
-            <Button 
-              onClick={triggerGoogleLogin} 
-              className="w-full flex items-center justify-center space-x-2 bg-white hover:bg-gray-100 text-gray-800 border border-gray-300"
-            >
-              <TbBrandGoogle className="w-5 h-5" />
-              <span>Iniciar sesión con Google</span>
-            </Button>
-            
-            {/* Botón de Google real (oculto) */}
-            <div ref={googleButtonRef} className="hidden">
-              <GoogleOAuthProvider clientId={process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || ''}>
-                <GoogleLogin
-                  onSuccess={handleGoogleSuccess}
-                  onError={() => console.log('Error con Google')}
-                  useOneTap
-                  type="icon"
-                  size="medium"
-                />
-              </GoogleOAuthProvider>
-            </div>
           </CardContent>
           <CardFooter className="text-center">
-              <p>¿No tienes cuenta? <Link href={ROUTES.PUBLIC.REGISTER} className="text-blue-500 hover:underline">Regístrate</Link></p>
+              <p className="flex items-center justify-center">
+                ¿No tienes cuenta? 
+                <Link href={ROUTES.PUBLIC.REGISTER} className="text-blue-500 hover:underline ml-2 flex items-center">
+                  <TbUser className="w-4 h-4 mr-1" />
+                  <span>Regístrate</span>
+                </Link>
+              </p>
           </CardFooter>
         </Card>
     );

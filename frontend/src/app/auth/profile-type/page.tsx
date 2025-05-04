@@ -1,7 +1,9 @@
-import React from 'react';
+"use client"
+
+import React, { useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { useRouter } from 'next/router';
+import { useRouter } from 'next/navigation';
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { TbUser, TbStethoscope } from "react-icons/tb";
@@ -11,6 +13,11 @@ export default function ProfileType() {
     const router = useRouter();
     const [selectedType, setSelectedType] = React.useState<string | null>(null);
 
+    // Limpiar el localStorage al cargar la página para permitir nueva selección
+    useEffect(() => {
+        localStorage.removeItem('selectedProfileType');
+    }, []);
+
     const handleSelect = (type: "patient" | "doctor") => {
         setSelectedType(type);
         localStorage.setItem('selectedProfileType', type);
@@ -18,10 +25,7 @@ export default function ProfileType() {
 
     const handleCreateAccount = () => {
         if (selectedType) {
-            router.push({
-                pathname: ROUTES.PUBLIC.REGISTER,
-                query: { type: selectedType }
-            });
+            router.push(`${ROUTES.PUBLIC.REGISTER}?type=${selectedType}`);
         }
     }
 
@@ -106,7 +110,7 @@ export default function ProfileType() {
                 
                 <p>
                     ¿Ya tienes una cuenta?{" "}
-                    <Link href={ROUTES.PUBLIC.LOGIN} className="text-green-600 hover:underline font-medium">
+                    <Link href={ROUTES.PUBLIC.LOGIN} className=" text-primary hover:text-primary-dark font-medium">
                         Inicia sesión aquí
                     </Link>
                 </p>

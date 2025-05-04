@@ -15,15 +15,26 @@ export default function ContentLayout({ children }: { children: React.ReactNode 
 
     // Check if current path is a public route
     const isPublicRoute = Object.values(ROUTES.PUBLIC).some(route => pathname === route || pathname?.startsWith(route));
+    
+    // Also consider root path as public
+    const isPublicOrRoot = isPublicRoute || pathname === '/';
 
     // Determine if we should show the full layout (sidebar + header)
-    const shouldShowFullLayout = isAuthenticated && !isPublicRoute;
+    const shouldShowFullLayout = isAuthenticated && !isPublicOrRoot;
 
     React.useEffect(() => {
-
+        // Only redirect if not loading
         if (!loading) {
+          // Handle root path - silently redirect to login if not authenticated
+          if (pathname === '/' && !isAuthenticated) {
+            router.push(ROUTES.PUBLIC.LOGIN);
+            return;
+          }
+          
+          // Only redirect from protected routes to login if not authenticated
+          // Don't redirect away from public routes
           if (!isAuthenticated && !isPublicRoute && pathname !== '/') {
-            router.push('/auth/login?from=' + encodeURIComponent(pathname || ''));
+            router.push(ROUTES.PUBLIC.LOGIN + '?from=' + encodeURIComponent(pathname || ''));
           }
         }
     }, [isAuthenticated, isPublicRoute, loading, pathname, router]);
@@ -51,11 +62,10 @@ export default function ContentLayout({ children }: { children: React.ReactNode 
     // Simple layout for public routes
     return (
       <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
-        {isPublicRoute ? (
+        {isPublicOrRoot ? (
           // Layout for public pages (login, register, etc.)
           <div className="flex justify-center items-center min-h-screen">
-
-              {children}
+            {children}
           </div>
         ) : (
           // Layout for unauthorized access (should be handled by middleware)
