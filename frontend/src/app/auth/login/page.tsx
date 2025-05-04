@@ -1,7 +1,9 @@
+"use client";
+
 import React, { useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { useRouter } from 'next/router';
+import { useRouter } from 'next/navigation';
 import { useAuth } from '@/hooks/useAuth';
 import { GoogleOAuthProvider, GoogleLogin, CredentialResponse } from '@react-oauth/google';
 import { Card, CardHeader, CardTitle, CardContent, CardFooter } from "@/components/ui/card";
