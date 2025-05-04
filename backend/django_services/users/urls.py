@@ -7,7 +7,7 @@ from .views import (
     UserProfileView, UserViewSet, PasswordResetRequestView, 
     PasswordResetVerifyView, ChangePasswordView, AccountDeleteView, 
     PatientHistoryCreateView, PatientHistoryViewSet, PatientViewSet,
-    DoctorViewSet, ChatbotPatientUpdateView, PatientMeView, 
+    DoctorViewSet, PatientMeView, 
     PatientMeHistoryView, DoctorPatientRelationViewSet, PatientMedicalDataUpdateView
 )
 
@@ -47,9 +47,6 @@ urlpatterns = [
     path('patients/me/', PatientMeView.as_view(), name='patient-me'),
     path('patients/me/history/', PatientMeHistoryView.as_view(), name='patient-me-history'),
     
-    # Actualización por chatbot
-    path('patients/<uuid:patient_id>/chatbot-update/', ChatbotPatientUpdateView.as_view(), name='patient-chatbot-update'),
-    path('patients/me/chatbot-update/', ChatbotPatientUpdateView.as_view(), name='patient-me-chatbot-update'),
 
     # Actualización de datos médicos por Flask
     path('api/patients/medical_data_update/', PatientMedicalDataUpdateView.as_view(), name='medical_data_update'),
