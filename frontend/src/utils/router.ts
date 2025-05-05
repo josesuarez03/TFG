@@ -18,7 +18,7 @@ export function useAppRouter() {
         router.push(path);
       }
     },
-    toHome: () => router.push('/'),  // Will be redirected to login by middleware
+    toHome: () => router.push(ROUTES.PROTECTED.DASHBOARD),  // Will be redirected to login by middleware
     toRegister: () => router.push(ROUTES.PUBLIC.REGISTER),
     toProfileType: () => router.push(ROUTES.PUBLIC.PROFILE_TYPE),
     toRecoverPassword: (fromLogin = true) => {
