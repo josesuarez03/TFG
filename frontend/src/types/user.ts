@@ -33,7 +33,37 @@ export interface UserProfile {
 export interface RegisterData {
   email: string;
   password: string;
+  password2: string;
   first_name: string;
   last_name: string;
   tipo: string;
+}
+
+export interface LoginCredentials {
+  email: string;
+  password: string;
+}
+
+export interface ProfileUpdateData {
+  first_name?: string;
+  last_name?: string;
+  email?: string;
+  fecha_nacimiento?: string;
+  telefono?: string;
+  direccion?: string;
+  genero?: string;
+  patient?: {
+    triaje_level?: string;
+    ocupacion?: string;
+    pain_scale?: number;
+    medical_context?: string;
+    allergies?: string;
+    medications?: string;
+    medical_history?: string;
+  };
+  doctor?: {
+    especialidad?: string;
+    numero_licencia?: string;
+  };
+  [key: string]: unknown; // Para otros campos adicionales
 }
