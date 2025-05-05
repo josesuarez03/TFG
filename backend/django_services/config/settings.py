@@ -60,7 +60,36 @@ MIDDLEWARE = [
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
 
-CORS_ALLOW_ALL_ORIGINS = True  # Puedes restringirlo en producción
+# Configura CORS explícitamente para todos los orígenes que necesitas
+CORS_ALLOW_ALL_ORIGINS = True  # En desarrollo, puedes permitir todos
+
+CORS_ALLOWED_ORIGINS = [
+    'http://localhost:3000',
+    'http://127.0.0.1:3000',
+    'http://192.168.56.1:3000',
+]
+
+# Permitir credenciales (cookies, encabezados de autorización, etc.)
+CORS_ALLOW_CREDENTIALS = True
+
+# Explícitamente permitir métodos HTTP 
+CORS_ALLOW_METHODS = ['DELETE', 'GET', 'OPTIONS', 'PATCH', 'POST', 'PUT',]
+
+CORS_ALLOW_HEADERS = [
+    'accept',
+    'accept-encoding',
+    'authorization',
+    'content-type',
+    'dnt',
+    'origin',
+    'user-agent',
+    'x-csrftoken',
+    'x-requested-with',
+]
+
+CORS_EXPOSE_HEADERS = ['Content-Type', 'X-CSRFToken']
+
+CORS_PREFLIGHT_MAX_AGE = 86400  
 
 ROOT_URLCONF = 'config.urls'
 WSGI_APPLICATION = 'config.wsgi.application'
