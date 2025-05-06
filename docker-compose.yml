@@ -125,13 +125,13 @@ services:
     image: nginx:alpine
     container_name: nginx
     ports:
-      - "8080:80"  # Changed from 8080:80 to properly receive HTTP traffic
-      - "8443:443"  # Changed from 8443:443 to properly receive HTTPS traffic
-      - "8443:443/udp"  # Para soporte QUIC/HTTP3
+      - "80:80"  # Changed to standard port 80 for HTTP
+      - "443:443"  # Changed to standard port 443 for HTTPS
+      - "443:443/udp"  # For QUIC/HTTP3 support
     volumes:
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf
       - ./data/certbot/conf:/etc/letsencrypt
-      - ./data/certbot/www:/var/lib/letsencrypt
+      - ./data/certbot/www:/var/www/html/.well-known/acme-challenge
       - ./webroot:/var/www/html
     restart: unless-stopped
     networks:
@@ -145,12 +145,12 @@ services:
     container_name: certbot
     volumes:
       - ./data/certbot/conf:/etc/letsencrypt
-      - ./data/certbot/www:/var/lib/letsencrypt
+      - ./data/certbot/www:/var/www/html/.well-known/acme-challenge
       - ./webroot:/var/www/html
     depends_on:
       - nginx
-    # Command for actual certificate (production)
-    command: certonly --webroot --webroot-path=/var/www/html --email your@email.com --agree-tos --no-eff-email --force-renewal -d api.medicheck.com -d www.api.medicheck.com
+    # Command modified to use staging environment first for testing
+    command: certonly --webroot --webroot-path=/var/www/html --email your@email.com --agree-tos --no-eff-email --staging -d api.medcheck.com -d www.api.medcheck.com
     networks:
       - app
   
@@ -167,14 +167,14 @@ services:
       - nginx
     volumes:
       - ./frontend:/app
-      - /app/node_modules  # Evita que los node_modules locales sobrescriban los del contenedor
-      - /app/.next  # Evita que la carpeta .next se sincronice con la local
+      - /app/node_modules  # Prevents local node_modules from overwriting container's
+      - /app/.next  # Prevents local .next folder from syncing with container
     environment:
       - CHOKIDAR_USEPOLLING=true
       - WATCHPACK_POLLING=true
       - NODE_ENV=development
-    stdin_open: true  # Equivalente a -i en docker run
-    tty: true         # Equivalente a -t en docker run
+    stdin_open: true  # Equivalent to -i in docker run
+    tty: true         # Equivalent to -t in docker run
     restart: unless-stopped
     networks:
       - app
