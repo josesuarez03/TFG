@@ -11,6 +11,7 @@ const API = axios.create({
     'Content-Type': 'application/json',
     'Accept': 'application/json',
   },
+  timeout: 10000,
   withCredentials: true,
 });
 
@@ -87,6 +88,20 @@ export const login = async (credentials: LoginCredentials): Promise<LoginRespons
     return response.data;
   } catch (error) {
     console.error('Error en la función de inicio de sesión:', error);
+    throw error;
+  }
+};
+
+export const loginWithGoogle = async (token: string, profile_type:string): Promise<LoginResponse> => {
+  try {
+    const response = await API.post('google/login', { token, profile_type:profile_type });
+    if (response.status !== 200) {
+        throw new Error('Error al iniciar sesión con Google');
+        }
+    return response.data;
+  }
+  catch (error) {
+    console.error('Error en la función de inicio de sesión con Google:', error);
     throw error;
   }
 };

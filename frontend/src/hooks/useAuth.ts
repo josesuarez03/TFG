@@ -1,13 +1,11 @@
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import axios from "axios";
-import API from "@/services/api";
-import { LoginResponse } from "@/types/auth";
+import { login as apiLogin, loginWithGoogle as apiLoginWithGoogle, getUserProfile, logout as apiLogout } from "@/services/api";
+//import { LoginResponse } from "@/types/auth";
 import { UserProfile } from "@/types/user";
 import { ROUTES } from "@/routes/routePaths";
 import { clearAuthCookies, updateAuthCookies } from "@/utils/authSync";
-
-
 
 export function useAuth() {
   const router = useRouter();
@@ -25,13 +23,14 @@ export function useAuth() {
         console.log('No hay token disponible');
         setUser(null);
         setIsAuthenticated(false);
+        setLoading(false);
         return;
       }
       
-      // Usar API importado para mantener consistencia
-      const response = await API.get<UserProfile>("/profile/");
-      console.log('Perfil obtenido:', response.data);
-      setUser(response.data);
+      // Usar la función getUserProfile importada desde api.ts
+      const userProfile = await getUserProfile();
+      console.log('Perfil obtenido:', userProfile);
+      setUser(userProfile);
       setIsAuthenticated(true);
     } catch (err) {
       console.error("Error al obtener perfil de usuario:", err);
@@ -45,6 +44,8 @@ export function useAuth() {
         sessionStorage.removeItem('refresh_token');
         clearAuthCookies();
       }
+    } finally {
+      setLoading(false);
     }
   }, []);
 
@@ -55,14 +56,11 @@ export function useAuth() {
       
       console.log('Intentando iniciar sesión con email:', email);
       
-      // Usar API importado en lugar de axios directo para mantener consistencia
-      const response = await API.post<LoginResponse>(
-        "/login/", 
-        { email, password }
-      );
-
-      console.log('Respuesta de login:', response.data);
-      const { access, refresh } = response.data;
+      // Usar la función de login exportada desde api.ts
+      const loginData = await apiLogin({ email, password });
+      
+      console.log('Respuesta de login:', loginData);
+      const { access, refresh } = loginData;
 
       // Guardar tokens en sessionStorage
       sessionStorage.setItem("access_token", access);
@@ -99,17 +97,11 @@ export function useAuth() {
       
       console.log('Intentando login con Google, tipo:', tipo);
 
-      // Usar API importado para mantener consistencia
-      const response = await API.post<LoginResponse>(
-        "/google/login/", 
-        {
-          token: googleToken,
-          profile_type: tipo,
-        }
-      );
+      // Usar la función de login con Google exportada desde api.ts
+      const loginData = await apiLoginWithGoogle(googleToken, tipo);
       
-      console.log('Respuesta de Google login:', response.data);
-      const { access, refresh } = response.data;
+      console.log('Respuesta de Google login:', loginData);
+      const { access, refresh } = loginData;
 
       // Guardar tokens
       sessionStorage.setItem("access_token", access);
@@ -141,25 +133,39 @@ export function useAuth() {
 
   const logout = useCallback(() => {
     console.log('Cerrando sesión...');
-    sessionStorage.removeItem('access_token');
-    sessionStorage.removeItem('refresh_token');
-    clearAuthCookies();
-    setUser(null);
-    setIsAuthenticated(false);
-    router.push(ROUTES.PUBLIC.LOGIN);
+    
+    // Utilizar la función de logout exportada desde api.ts
+    apiLogout()
+      .catch(err => console.error('Error en logout API:', err))
+      .finally(() => {
+        // La función apiLogout ya limpia sessionStorage, pero aseguramos la limpieza completa
+        sessionStorage.removeItem('access_token');
+        sessionStorage.removeItem('refresh_token');
+        clearAuthCookies();
+        setUser(null);
+        setIsAuthenticated(false);
+        router.push(ROUTES.PUBLIC.LOGIN);
+      });
   }, [router]);
 
   // Verificar autenticación al cargar el componente
   useEffect(() => {
     const checkAuth = async () => {
-      const token = sessionStorage.getItem("access_token");
-      console.log('Token en sessionStorage:', token ? 'presente' : 'ausente');
-      
-      if (token) {
-        await fetchUserProfile();
+      try {
+        const token = sessionStorage.getItem("access_token");
+        console.log('Token en sessionStorage:', token ? 'presente' : 'ausente');
+        
+        if (token) {
+          await fetchUserProfile();
+        } else {
+          setLoading(false);
+          setIsAuthenticated(false);
+        }
+      } catch (error) {
+        console.error("Error verificando autenticación:", error);
+        setLoading(false);
+        setIsAuthenticated(false);
       }
-      
-      setLoading(false);
     };
     
     checkAuth();
@@ -173,5 +179,6 @@ export function useAuth() {
     login,
     loginWithGoogle,
     logout,
+    refreshProfile: fetchUserProfile,
   };
 }
