@@ -15,29 +15,20 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import API from '@/services/api';
-import { 
-  TbBrandGoogle, 
-  TbLock, 
-  TbMail, 
-  TbUser, 
-  TbUsers, 
-  TbLoader,
-  TbAlertTriangle,
-  TbLogin,
-  TbUserCircle,
-  TbCheckbox
-} from "react-icons/tb";
+import { register as apiRegister } from '@/services/api';
+import axios from 'axios';
+import { TbBrandGoogle, TbLock, TbMail, TbUser, TbUsers, TbLoader, TbAlertTriangle, TbLogin, TbUserCircle, TbCheckbox, TbAt } from "react-icons/tb";
 import { ROUTES } from '@/routes/routePaths';
 
+// Esquema de validación con Zod
 const registerSchema = z.object({
     email: z.string()
         .min(1, { message: 'El email es obligatorio' })
-        .email({ message: 'Email inválido' })
-        .regex(
-            /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/,
-            { message: 'El email debe tener un formato válido (ejemplo@dominio.com)' }
-      ),
+        .email({ message: 'Email inválido' }),
+    username: z.string()
+        .min(3, { message: 'El nombre de usuario debe tener al menos 3 caracteres' })
+        .max(30, { message: 'El nombre de usuario no puede exceder los 30 caracteres' })
+        .regex(/^[a-zA-Z0-9_]+$/, { message: 'El nombre de usuario solo puede contener letras, números y guiones bajos' }),
     password: z.string()
         .min(8, { message: 'La contraseña debe tener al menos 8 caracteres' })
         .regex(/[A-Z]/, { message: 'Debe contener al menos una letra mayúscula' })
@@ -71,7 +62,7 @@ export default function Register() {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [googleError, setGoogleError] = useState<string | null>(null);
-    const [googleLoginButtonRef, setGoogleLoginButtonRef] = useState<HTMLDivElement | null>(null);
+    const [serverStatus, setServerStatus] = useState<'online' | 'offline' | 'checking'>('checking');
     
     const { register, handleSubmit, formState: { errors }, setValue } = useForm<RegisterFormInputs>({
         resolver: zodResolver(registerSchema),
@@ -85,57 +76,126 @@ export default function Register() {
         if (!type) {
             router.push(ROUTES.PUBLIC.PROFILE_TYPE);
         } else {
-            // Guardar en localStorage cuando haya un tipo válido
             localStorage.setItem('selectedProfileType', type);
             setValue('tipo', type);
         }
     }, [type, router, setValue]);
 
+
     const onSubmit = async (data: RegisterFormInputs) => {
+        setServerStatus('checking');
+        
+        setLoading(true);
+        setError(null);
+        
+        const registerData = {
+            email: data.email,
+            username: data.username,
+            password: data.password,
+            password2: data.confirmPassword,
+            first_name: data.first_name,
+            last_name: data.last_name,
+            tipo: data.tipo,
+        };
+        
+        
         try {
-            setLoading(true);
-            setError(null);
-            // Llamar a la API para registrar al usuario
-            const response = await API.post('register/', {
-                email: data.email,
-                password: data.password,
-                first_name: data.first_name,
-                last_name: data.last_name,
-                tipo: data.tipo
-            });
+            // Usar la función de registro importada
+            setServerStatus('online');
+            const response = await apiRegister(registerData);
+            console.log('Registro exitoso:', response);
             
-            // Si el registro es exitoso, iniciar sesión automáticamente
-            if (response.status === 201) {
+            // Intentar login automático después del registro
+            try {
                 await login(data.email, data.password);
+                console.log('Login automático exitoso');
+                // No es necesario redireccionar aquí ya que useAuth ya lo hace
+            } catch (loginErr) {
+                console.error('Error en login automático:', loginErr);
+                setError("Registro exitoso, pero hubo un problema al iniciar sesión automáticamente. Por favor, inicia sesión manualmente.");
+                router.push(ROUTES.PUBLIC.LOGIN);
             }
         } catch (err) {
-            console.error('Error al registrar:', err);
-            setError(err instanceof Error ? err.message : "Error al registrar usuario");
+            console.error('Error en el registro:', err);
+            
+            if (axios.isAxiosError(err)) {
+                // Si es un error de red
+                if (!err.response) {
+                    setError('No se puede conectar al servidor. Por favor, verifica tu conexión a internet.');
+                    setServerStatus('offline');
+                } else {
+                    const errorData = err.response?.data;
+                    console.error('Detalles del error:', errorData);
+                    
+                    // Extraer mensaje de error de forma más robusta
+                    let errorMessage = 'Error en el registro. Por favor revisa tus datos.';
+                    
+                    if (typeof errorData === 'object' && errorData !== null) {
+                        // Buscar mensajes de error en varios lugares posibles
+                        if (errorData.detail) {
+                            errorMessage = errorData.detail;
+                        } else if (errorData.email && Array.isArray(errorData.email)) {
+                            errorMessage = `Email: ${errorData.email[0]}`;
+                        } else if (errorData.username && Array.isArray(errorData.username)) {
+                            errorMessage = `Usuario: ${errorData.username[0]}`;
+                        } else if (errorData.non_field_errors && Array.isArray(errorData.non_field_errors)) {
+                            errorMessage = errorData.non_field_errors[0];
+                        }
+                    }
+                    
+                    setError(errorMessage);
+                }
+            } else {
+                setError("Error desconocido. Por favor, inténtalo nuevamente.");
+            }
         } finally {
             setLoading(false);
         }
     };
 
-    const handleGoogleSuccess = async (credentialResponse: CredentialResponse) => {
-        if (!credentialResponse.credential) return;
+    // Componente para el botón de Google mejorado
+    const GoogleSignInButton = () => {
+        const handleGoogleSuccess = async (credentialResponse: CredentialResponse) => {
+            if (!credentialResponse.credential) {
+                setGoogleError("No se pudo obtener credenciales de Google");
+                return;
+            }
 
-        try {
-            setGoogleError(null);
-            // Obtener el tipo de usuario actual y pasarlo a loginWithGoogle
-            const profileType = type || 'patient';
-            await loginWithGoogle(credentialResponse.credential, profileType);
-        } catch (err) {
-            console.error("Error con Google login:", err);
-            setGoogleError("Error al iniciar sesión con Google. Por favor intenta nuevamente.");
-        }
+            try {
+                setGoogleError(null);
+                // Usar el tipo actual para el registro
+                await loginWithGoogle(credentialResponse.credential, type || 'patient');
+            } catch (err) {
+                console.error("Error con Google login:", err);
+                setGoogleError("Error al iniciar sesión con Google. Por favor intenta nuevamente.");
+            }
+        };
+
+        return (
+            <div className="mb-4">
+                <GoogleOAuthProvider 
+                    clientId={process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || ''}
+                >
+                    <div className="flex justify-center w-full">
+                        <GoogleLogin
+                            onSuccess={handleGoogleSuccess}
+                            onError={() => setGoogleError("Error al iniciar sesión con Google")}
+                            useOneTap={false}
+                            theme="outline" 
+                            text="signup_with"
+                            shape="rectangular"
+                            size="large"
+                            locale="es"
+                            context="signup"
+                            width={320}
+                        />
+                    </div>
+                </GoogleOAuthProvider>
+            </div>
+        );
     };
 
-    const handleGoogleError = () => {
-        console.log('Error con Google login');
-        setGoogleError("Error al iniciar sesión con Google. Por favor intenta nuevamente.");
-    };
-
-    // Mostrar texto basado en el tipo de usuario
+    // Determinar texto según tipo de usuario
     const getUserTypeText = () => {
         return type === 'doctor' ? 'Médico' : 'Paciente';
     };
@@ -162,6 +222,7 @@ export default function Register() {
             </CardTitle>
           </CardHeader>
           <CardContent>
+            {/* Mostrar alertas de error si existen */}
             {(authError || error || googleError) && (
                 <Alert variant="destructive" className="mb-4">
                     <AlertDescription className="flex items-center">
@@ -170,50 +231,19 @@ export default function Register() {
                     </AlertDescription>
                 </Alert>
             )}
-          
-            {/* Botón de Google con el proveedor correctamente configurado */}
-            <GoogleOAuthProvider 
-                clientId={process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || ''}
-            >
-                <div className="mb-4">
-                    <Button 
-                        type="button"
-                        className="w-full flex items-center justify-center space-x-2 bg-white hover:bg-gray-100 text-gray-800 border border-gray-300"
-                        onClick={() => {
-                            if (googleLoginButtonRef) {
-                                // Trigger the hidden Google button's click event
-                                const buttons = googleLoginButtonRef.querySelectorAll('button');
-                                if (buttons && buttons.length > 0) {
-                                    buttons[0].click();
-                                } else {
-                                    setGoogleError("Error al iniciar sesión con Google. Por favor intenta nuevamente.");
-                                }
-                            } else {
-                                setGoogleError("Error al iniciar botón de Google. Inténtalo nuevamente.");
-                            }
-                        }}
-                    >
-                        <TbBrandGoogle className="w-5 h-5" />
-                        <span>Registrarse con Google</span>
-                    </Button>
-                    
-                    <div ref={setGoogleLoginButtonRef} style={{ display: 'none' }}>
-                        <GoogleLogin
-                            onSuccess={handleGoogleSuccess}
-                            onError={handleGoogleError}
-                            useOneTap={false}
-                            auto_select={false}
-                            theme="outline"
-                            text="signin_with"
-                            shape="rectangular"
-                            size="large"
-                            locale="es"
-                            ux_mode="popup"
-                            context="signup"
-                        />
-                    </div>
-                </div>
-            </GoogleOAuthProvider>
+            
+            {/* Estado del servidor */}
+            {serverStatus === 'checking' && (
+                <Alert className="mb-4">
+                    <AlertDescription className="flex items-center">
+                        <TbLoader className="animate-spin w-5 h-5 mr-2" />
+                        <span>Comprobando conexión con el servidor...</span>
+                    </AlertDescription>
+                </Alert>
+            )}
+            
+            {/* Componente mejorado de Google Sign-In */}
+            <GoogleSignInButton />
             
             <Separator className="my-4" />
 
@@ -225,6 +255,14 @@ export default function Register() {
                     </Label>
                     <Input type="email" {...register('email')} />
                     {errors.email && <p className="text-red-500 text-sm">{errors.email.message}</p>}
+                </div>
+                <div>
+                    <Label className="flex items-center">
+                        <TbAt className="w-5 h-5 mr-2 text-gray-500" />
+                        Nombre de usuario
+                    </Label>
+                    <Input type="text" {...register('username')} />
+                    {errors.username && <p className="text-red-500 text-sm">{errors.username.message}</p>}
                 </div>
                 <div>
                     <Label className="flex items-center">
@@ -262,7 +300,11 @@ export default function Register() {
                 {/* Campo oculto para el tipo de usuario */}
                 <input type="hidden" {...register('tipo')} />
                 
-                <Button type="submit" disabled={loading || authLoading} className="w-full flex items-center justify-center">
+                <Button 
+                    type="submit" 
+                    //disabled={loading || authLoading || serverStatus !== 'online'} 
+                    className="w-full flex items-center justify-center"
+                >
                     {(loading || authLoading) ? (
                         <>
                             <TbLoader className="animate-spin h-5 w-5 mr-3" />
@@ -277,7 +319,7 @@ export default function Register() {
             </form>
           </CardContent>
           <CardFooter className="text-center">
-                <p className="flex items-center justify-center">
+                <p className="flex items-center justify-center w-full">
                     ¿Ya tienes cuenta? 
                     <Link href={ROUTES.PUBLIC.LOGIN} className="text-blue-500 hover:underline ml-2 flex items-center">
                         <TbLogin className="w-4 h-4 mr-1" />
