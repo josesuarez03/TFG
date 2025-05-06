@@ -1,11 +1,12 @@
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
+import axios from "axios";
 import API from "@/services/api";
-import { jwtDecode } from "jwt-decode";
 import { LoginResponse } from "@/types/auth";
-import { UserProfile, RegisterData } from "@/types/user";
-import { syncAuthState, updateAuthCookies, clearAuthCookies } from "@/utils/authSync";
+import { UserProfile } from "@/types/user";
 import { ROUTES } from "@/routes/routePaths";
+import { clearAuthCookies, updateAuthCookies } from "@/utils/authSync";
+
 
 
 export function useAuth() {
@@ -15,195 +16,155 @@ export function useAuth() {
   const [error, setError] = useState<string | null>(null);
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
 
-  // Decode token to get profile completion status and user type
-  const decodeToken = (token: string) => {
+  const fetchUserProfile = useCallback(async () => {
     try {
-      return jwtDecode<{ is_profile_completed?: boolean; tipo?: string }>(token);
-    } catch (err) {
-      console.error("Error decoding token:", err);
-      return null;
-    }
-  };
-
-  // Fetch user profile data
-  const fetchUser = useCallback(async (): Promise<UserProfile | null> => {
-    try {
-      const response = await API.get<UserProfile>("profile/");
-      const userData = response.data;
-      setUser(userData);
+      console.log('Intentando obtener perfil de usuario...');
+      const token = sessionStorage.getItem('access_token');
+      
+      if (!token) {
+        console.log('No hay token disponible');
+        setUser(null);
+        setIsAuthenticated(false);
+        return;
+      }
+      
+      // Usar API importado para mantener consistencia
+      const response = await API.get<UserProfile>("/profile/");
+      console.log('Perfil obtenido:', response.data);
+      setUser(response.data);
       setIsAuthenticated(true);
-      return userData;
     } catch (err) {
-      console.error("Error fetching user profile:", err);
+      console.error("Error al obtener perfil de usuario:", err);
       setUser(null);
       setIsAuthenticated(false);
-      return null;
-    } finally {
-      setLoading(false);
+      
+      // Verificar si el error es por token inválido o expirado
+      if (axios.isAxiosError(err) && err.response?.status === 401) {
+        console.log('Token inválido o expirado, limpiando datos de sesión');
+        sessionStorage.removeItem('access_token');
+        sessionStorage.removeItem('refresh_token');
+        clearAuthCookies();
+      }
     }
   }, []);
 
-  // Handle login
-  const login = async (email: string, password: string): Promise<void> => {
-    setLoading(true);
-    setError(null);
-
+  const login = useCallback(async (email: string, password: string) => {
     try {
-      const response = await API.post<LoginResponse>("token/", { email, password });
+      setLoading(true);
+      setError(null);
+      
+      console.log('Intentando iniciar sesión con email:', email);
+      
+      // Usar API importado en lugar de axios directo para mantener consistencia
+      const response = await API.post<LoginResponse>(
+        "/login/", 
+        { email, password }
+      );
+
+      console.log('Respuesta de login:', response.data);
       const { access, refresh } = response.data;
 
-      // Store tokens in localStorage
-      localStorage.setItem("access_token", access);
-      localStorage.setItem("refresh_token", refresh);
-      
-      // Update cookies for middleware
+      // Guardar tokens en sessionStorage
+      sessionStorage.setItem("access_token", access);
+      sessionStorage.setItem("refresh_token", refresh);
       updateAuthCookies(access);
-      
-      // Set authenticated state
-      setIsAuthenticated(true);
 
-      // Get user data
-      await fetchUser();
-      
-      // Handle redirection based on profile completion
-      const decodedToken = decodeToken(access);
-      if (decodedToken?.is_profile_completed === false) {
-        router.push(ROUTES.PROTECTED.PROFILE_COMPLETE);
-      } else {
-        router.push(ROUTES.PROTECTED.DASHBOARD);
-      }
+      // Obtener datos del perfil
+      await fetchUserProfile();
+
+      setIsAuthenticated(true);
+      router.push(ROUTES.PROTECTED.DASHBOARD);
     } catch (err: unknown) {
-      const errorMessage = err instanceof Error ? err.message : "Unknown login error";
-      setError(errorMessage);
+      console.error("Error en login:", err);
+      
+      let message = "Login failed";
+      if (axios.isAxiosError(err)) {
+        const errorData = err.response?.data;
+        message = errorData?.detail || errorData?.non_field_errors?.[0] || "Credenciales inválidas";
+        console.error('Detalles del error:', errorData);
+      }
+      
+      setError(message);
       setIsAuthenticated(false);
+      setUser(null);
     } finally {
       setLoading(false);
     }
-  };
+  }, [fetchUserProfile, router]);
 
-  // Handle Google login
-  const loginWithGoogle = async (token: string, profileType?: string): Promise<void> => {
-    setLoading(true);
-    setError(null);
-
+  const loginWithGoogle = useCallback(async (googleToken: string, tipo: string) => {
     try {
-      // Get profile type from parameter or localStorage
-      const tipo = profileType || localStorage.getItem('selectedProfileType') || 'patient';
+      setLoading(true);
+      setError(null);
       
-      // Make API request with both token and tipo
-      const response = await API.post<LoginResponse>("google/login/", { 
-        token,
-        tipo
-      });
+      console.log('Intentando login con Google, tipo:', tipo);
+
+      // Usar API importado para mantener consistencia
+      const response = await API.post<LoginResponse>(
+        "/google/login/", 
+        {
+          token: googleToken,
+          profile_type: tipo,
+        }
+      );
       
+      console.log('Respuesta de Google login:', response.data);
       const { access, refresh } = response.data;
 
-      // Store tokens in localStorage
-      localStorage.setItem("access_token", access);
-      localStorage.setItem("refresh_token", refresh);
-      
-      // Update cookies for middleware
+      // Guardar tokens
+      sessionStorage.setItem("access_token", access);
+      sessionStorage.setItem("refresh_token", refresh);
       updateAuthCookies(access);
-      
-      // Set authenticated state
-      setIsAuthenticated(true);
 
-      // Get user data
-      await fetchUser();
-      
-      // Handle redirection based on profile completion
-      const decodedToken = decodeToken(access);
-      if (decodedToken?.is_profile_completed === false) {
-        router.push(ROUTES.PROTECTED.PROFILE_COMPLETE);
-      } else {
-        router.push(ROUTES.PROTECTED.DASHBOARD);
-      }
+      // Obtener perfil
+      await fetchUserProfile();
+
+      setIsAuthenticated(true);
+      router.push(ROUTES.PROTECTED.DASHBOARD);
     } catch (err: unknown) {
-      const errorMessage = err instanceof Error ? err.message : "Unknown Google login error";
-      setError(errorMessage);
+      console.error("Error en Google login:", err);
+      
+      let message = "Google login failed";
+      if (axios.isAxiosError(err)) {
+        const errorData = err.response?.data;
+        message = errorData?.detail || "Error al iniciar sesión con Google";
+        console.error('Detalles del error Google:', errorData);
+      }
+      
+      setError(message);
       setIsAuthenticated(false);
+      setUser(null);
     } finally {
       setLoading(false);
     }
-  };
+  }, [fetchUserProfile, router]);
 
-  // Handle logout
-  const logout = useCallback((): void => {
-    // Clear tokens from localStorage
-    localStorage.removeItem("access_token");
-    localStorage.removeItem("refresh_token");
-    
-    // Clear cookies for middleware
+  const logout = useCallback(() => {
+    console.log('Cerrando sesión...');
+    sessionStorage.removeItem('access_token');
+    sessionStorage.removeItem('refresh_token');
     clearAuthCookies();
-    
-    // Reset state
     setUser(null);
     setIsAuthenticated(false);
-    
-    // Redirect to login page
     router.push(ROUTES.PUBLIC.LOGIN);
   }, [router]);
 
-  // Register a new user - with proper typing
-  const register = async (userData: RegisterData): Promise<void> => {
-    setLoading(true);
-    setError(null);
-
-    try {
-      await API.post("register/", userData);
-      // After successful registration, redirect to login
-      router.push(ROUTES.PUBLIC.LOGIN);
-    } catch (err: unknown) {
-      const errorMessage = err instanceof Error ? err.message : "Unknown registration error";
-      setError(errorMessage);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Check authentication status on mount
+  // Verificar autenticación al cargar el componente
   useEffect(() => {
     const checkAuth = async () => {
-      setLoading(true);
+      const token = sessionStorage.getItem("access_token");
+      console.log('Token en sessionStorage:', token ? 'presente' : 'ausente');
       
-      // Sync auth state with cookies
-      syncAuthState();
-      
-      const token = localStorage.getItem("access_token");
       if (token) {
-        // Token exists, fetch user data
-        const userData = await fetchUser();
-        if (!userData) {
-          // User data fetch failed, logout
-          logout();
-        }
-      } else {
-        // No token, user is not authenticated
-        setIsAuthenticated(false);
-        setLoading(false);
+        await fetchUserProfile();
       }
+      
+      setLoading(false);
     };
     
     checkAuth();
-    
-    // Listen for storage events (e.g., logout in another tab)
-    const handleStorageChange = (event: StorageEvent) => {
-      if (event.key === 'access_token') {
-        syncAuthState();
-        if (!event.newValue) {
-          setUser(null);
-          setIsAuthenticated(false);
-        }
-      }
-    };
-    
-    window.addEventListener('storage', handleStorageChange);
-    return () => {
-      window.removeEventListener('storage', handleStorageChange);
-    };
-  }, [fetchUser, logout]);
+  }, [fetchUserProfile]);
 
-  // Return hook state and methods
   return {
     user,
     loading,
@@ -212,7 +173,5 @@ export function useAuth() {
     login,
     loginWithGoogle,
     logout,
-    register,
-    fetchUser
   };
 }
