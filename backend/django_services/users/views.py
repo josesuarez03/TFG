@@ -1,4 +1,4 @@
-from django.contrib.auth import get_user_model
+from django.contrib.auth import get_user_model, authenticate
 from django.conf import settings
 from django.db import transaction
 from django.shortcuts import get_object_or_404
@@ -34,6 +34,49 @@ from .models import Patient, Doctor, PatientHistoryEntry, DoctorPatientRelation
 
 User = get_user_model()
 
+class LoginView(APIView):
+    permission_classes = [AllowAny]
+    
+    def post(self, request):
+        # Obtener credenciales
+        username = request.data.get('username')
+        password = request.data.get('password')
+        
+        # Autenticar usuario
+        user = authenticate(username=username, password=password)
+        
+        if user is not None:
+            if not user.is_active:
+                return Response(
+                    {"error": "La cuenta está desactivada."},
+                    status=status.HTTP_401_UNAUTHORIZED
+                )
+                
+            # Login exitoso, generar tokens JWT
+            refresh = RefreshToken.for_user(user)
+            
+            return Response({
+                'user': UserProfileSerializerBasic(user).data,
+                'refresh': str(refresh),
+                'access': str(refresh.access_token),
+                'profile_complete': user.is_profile_completed,
+                'message': 'Usuario autenticado correctamente.'
+            }, status=status.HTTP_200_OK)
+        
+        # Credenciales inválidas
+        return Response(
+            {"error": "Credenciales inválidas."},
+            status=status.HTTP_401_UNAUTHORIZED
+        )
+    
+    # Añadir método OPTIONS para manejar solicitudes preflight explícitamente
+    def options(self, request, *args, **kwargs):
+        response = Response()
+        response["Access-Control-Allow-Origin"] = "*"  # O el origen específico del frontend
+        response["Access-Control-Allow-Methods"] = "POST, OPTIONS"
+        response["Access-Control-Allow-Headers"] = "Content-Type, Authorization"
+        return response
+
 class RegisterUserView(generics.CreateAPIView):
     queryset = User.objects.all()
     serializer_class = UserSerializer
@@ -53,6 +96,13 @@ class RegisterUserView(generics.CreateAPIView):
                 'message': 'Usuario registrado correctamente. Complete su perfil.'
             }, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    
+    def options(self, request, *args, **kwargs):
+        response = Response()
+        response["Access-Control-Allow-Origin"] = "*"  # O el origen específico del frontend
+        response["Access-Control-Allow-Methods"] = "POST, OPTIONS"
+        response["Access-Control-Allow-Headers"] = "Content-Type, Authorization"
+        return response
     
 class GoogleOAuthLoginView(APIView):
     """Vista para autenticación con Google (login o registro)"""
@@ -104,6 +154,13 @@ class GoogleOAuthLoginView(APIView):
                 {"error": f"Error en autenticación con Google: {str(e)}"},
                 status=status.HTTP_400_BAD_REQUEST
             )
+    
+    def options(self, request, *args, **kwargs):
+        response = Response()
+        response["Access-Control-Allow-Origin"] = "*"  # O el origen específico del frontend
+        response["Access-Control-Allow-Methods"] = "POST, OPTIONS"
+        response["Access-Control-Allow-Headers"] = "Content-Type, Authorization"
+        return response
 
 class CompleteProfileView(generics.UpdateAPIView):
     """Vista para completar información adicional después del registro/login con OAuth"""

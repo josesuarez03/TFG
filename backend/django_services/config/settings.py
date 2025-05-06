@@ -63,11 +63,13 @@ MIDDLEWARE = [
 # Configura CORS explícitamente para todos los orígenes que necesitas
 CORS_ALLOW_ALL_ORIGINS = True  # En desarrollo, puedes permitir todos
 
-CORS_ALLOWED_ORIGINS = [
+#ALLOWED_HOSTS = ['localhost', '172.17.0.1']
+ALLOWED_HOSTS = ['*']
+
+"""CORS_ALLOWED_ORIGINS = [
     'http://localhost:3000',
-    'http://127.0.0.1:3000',
-    'http://192.168.56.1:3000',
-]
+    'http://172.17.0.1:3000',
+]"""
 
 # Permitir credenciales (cookies, encabezados de autorización, etc.)
 CORS_ALLOW_CREDENTIALS = True
@@ -89,7 +91,12 @@ CORS_ALLOW_HEADERS = [
 
 CORS_EXPOSE_HEADERS = ['Content-Type', 'X-CSRFToken']
 
-CORS_PREFLIGHT_MAX_AGE = 86400  
+CORS_PREFLIGHT_MAX_AGE = 86400
+
+CSRF_TRUSTED_ORIGINS = [
+    "http://localhost:3000",
+    "http://172.17.0.1:3000",
+]
 
 ROOT_URLCONF = 'config.urls'
 WSGI_APPLICATION = 'config.wsgi.application'
