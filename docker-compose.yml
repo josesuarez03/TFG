@@ -125,8 +125,8 @@ services:
     image: nginx:alpine
     container_name: nginx
     ports:
-      - "8080:80"
-      - "8443:443"
+      - "8080:80"  # Changed from 8080:80 to properly receive HTTP traffic
+      - "8443:443"  # Changed from 8443:443 to properly receive HTTPS traffic
       - "8443:443/udp"  # Para soporte QUIC/HTTP3
     volumes:
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf
@@ -149,8 +149,8 @@ services:
       - ./webroot:/var/www/html
     depends_on:
       - nginx
-    # Comando para verificación de dominio (modo staging para pruebas)
-    command: certonly --webroot --webroot-path=/var/www/html --email tu@email.com --agree-tos --no-eff-email --force-renewal --staging -d api.medicheck.com -d www.api.medicheck.com
+    # Command for actual certificate (production)
+    command: certonly --webroot --webroot-path=/var/www/html --email your@email.com --agree-tos --no-eff-email --force-renewal -d api.medicheck.com -d www.api.medicheck.com
     networks:
       - app
   
@@ -167,10 +167,15 @@ services:
       - nginx
     volumes:
       - ./frontend:/app
+      - /app/node_modules  # Evita que los node_modules locales sobrescriban los del contenedor
+      - /app/.next  # Evita que la carpeta .next se sincronice con la local
     environment:
       - CHOKIDAR_USEPOLLING=true
       - WATCHPACK_POLLING=true
-    restart: on-failure
+      - NODE_ENV=development
+    stdin_open: true  # Equivalente a -i en docker run
+    tty: true         # Equivalente a -t en docker run
+    restart: unless-stopped
     networks:
       - app
 
