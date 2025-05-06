@@ -1,4 +1,3 @@
-// src/middleware.ts
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { ROUTES } from '@/routes/routePaths';
@@ -19,85 +18,46 @@ export function middleware(request: NextRequest) {
   const userTypeCookie = request.cookies.get('userType')?.value;
   const profileCompletedCookie = request.cookies.get('isProfileCompleted')?.value;
   
-  // Check password recovery flow cookies
-  const recoveryInitiatedCookie = request.cookies.get('recoveryInitiated')?.value;
-  const recoveryEmailSentCookie = request.cookies.get('recoveryEmailSent')?.value;
-  
   const isAuthenticated = authCookie === 'true';
   
   // Define login path based on routes configuration
   const loginPath = ROUTES.PUBLIC.LOGIN;
-  const isLoginPage = pathname === loginPath;
-  
-  // Profile type selection path
-  const profileTypePath = ROUTES.PUBLIC.PROFILE_TYPE;
-  const isProfileTypePage = pathname === profileTypePath;
-  
-  // Root path handling - let client-side handle this to avoid redirect loops
+  const dashboardPath = ROUTES.PROTECTED.DASHBOARD;
+
+  // Handle root path `/`
   if (pathname === '/') {
-    // For the root path, we'll let ContentLayout handle it
-    // This prevents potential conflicts between middleware and client-side redirects
-    return NextResponse.next();
+    if (!isAuthenticated) {
+      // Redirect immediately to the login page
+      return NextResponse.redirect(new URL(loginPath, request.url));
+    }
+    // If authenticated, redirect to the dashboard
+    return NextResponse.redirect(new URL(dashboardPath, request.url));
   }
   
   // Allow direct access to specific public pages without authentication
-  if (isLoginPage || isProfileTypePage || pathname === ROUTES.PUBLIC.REGISTER) {
-    // Handle the specific case of profile type selection path
-    if (pathname === ROUTES.PUBLIC.REGISTER && !request.nextUrl.searchParams.get('type')) {
-      // If register page is accessed without a type parameter, redirect to profile type selection
-      return NextResponse.redirect(new URL(profileTypePath, request.url));
-    }
-    
+  if (pathMatches(pathname, ROUTES.PUBLIC)) {
     return NextResponse.next();
   }
   
-  // Handle password recovery flow
-  const recoverPasswordPath = ROUTES.PUBLIC.RECOVER_PASSWORD;
-  const verifyCodePath = ROUTES.PUBLIC.VERIFY_CODE;
-  const isRecoverPasswordPath = pathname === recoverPasswordPath;
-  const isVerifyCodePath = pathname === verifyCodePath;
-  
-  if (isRecoverPasswordPath || isVerifyCodePath) {
-    // For recover-password, verify if coming from login or already in flow
-    if (isRecoverPasswordPath && !recoveryInitiatedCookie) {
-      const fromLogin = request.nextUrl.searchParams.get('fromLogin');
-      if (fromLogin !== 'true') {
-        // If not from login and recovery flow not initiated, redirect to login
-        return NextResponse.redirect(new URL(loginPath, request.url));
-      }
-    }
-    
-    // For verify-code, check if recover-password completed
-    if (isVerifyCodePath && !recoveryEmailSentCookie) {
-      // If email not sent (recover-password not completed), redirect to recover-password
-      return NextResponse.redirect(new URL(recoverPasswordPath, request.url));
-    }
-    
-    // Allow access to password recovery pages if conditions met
-    return NextResponse.next();
-  }
-  
-  // Unauthenticated user trying to access protected route
-  if (!isAuthenticated && 
-      (pathMatches(pathname, ROUTES.PROTECTED) || pathMatches(pathname, ROUTES.DOCTOR))) {
+  // Handle unauthenticated access to protected routes
+  if (!isAuthenticated && (pathMatches(pathname, ROUTES.PROTECTED) || pathMatches(pathname, ROUTES.DOCTOR))) {
     const url = new URL(loginPath, request.url);
     url.searchParams.set('from', pathname);
     return NextResponse.redirect(url);
   }
   
-  // Authenticated user trying to access public routes (like login/register)
+  // Handle authenticated access to public routes
   if (isAuthenticated && pathMatches(pathname, ROUTES.PUBLIC)) {
-    return NextResponse.redirect(new URL(ROUTES.PROTECTED.DASHBOARD, request.url));
+    return NextResponse.redirect(new URL(dashboardPath, request.url));
   }
   
   // Handle doctor-specific routes
   if (isAuthenticated && pathMatches(pathname, ROUTES.DOCTOR) && userTypeCookie !== 'doctor') {
-    return NextResponse.redirect(new URL(ROUTES.PROTECTED.DASHBOARD, request.url));
+    return NextResponse.redirect(new URL(dashboardPath, request.url));
   }
   
   // Check profile completion
-  if (isAuthenticated && pathname !== ROUTES.PROTECTED.PROFILE_COMPLETE && 
-      profileCompletedCookie === 'false') {
+  if (isAuthenticated && pathname !== ROUTES.PROTECTED.PROFILE_COMPLETE && profileCompletedCookie === 'false') {
     return NextResponse.redirect(new URL(ROUTES.PROTECTED.PROFILE_COMPLETE, request.url));
   }
   
