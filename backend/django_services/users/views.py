@@ -39,9 +39,16 @@ class LoginView(APIView):
     
     def post(self, request):
         # Obtener credenciales
-        username = request.data.get('username')
+        username_or_email = request.data.get('username_or_email')
         password = request.data.get('password')
         
+        try:
+            user = User.objects.get(email=username_or_email)
+            username = user.username
+        except User.DoesNotExist:
+            # Si no existe un usuario con ese correo, asumir que es un nombre de usuario
+            username = username_or_email
+
         # Autenticar usuario
         user = authenticate(username=username, password=password)
         
