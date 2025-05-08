@@ -39,18 +39,30 @@ class LoginView(APIView):
     
     def post(self, request):
         # Obtener credenciales
-        username_or_email = request.data.get('username_or_email')
+        email_or_username = request.data.get('email') or request.data.get('username')
         password = request.data.get('password')
-        
-        try:
-            user = User.objects.get(email=username_or_email)
-            username = user.username
-        except User.DoesNotExist:
-            # Si no existe un usuario con ese correo, asumir que es un nombre de usuario
-            username = username_or_email
 
-        # Autenticar usuario
-        user = authenticate(username=username, password=password)
+        if not email_or_username:
+            return Response(
+                {"error": "Se requiere email o username."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        if not password:
+            return Response(
+                {"error": "Se requiere contraseña."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Intentar autenticar con username o email
+        user = authenticate(request, username=email_or_username, password=password)
+        if user is None:
+            try:
+                user_obj = User.objects.get(email=email_or_username)
+                user = authenticate(request, username=user_obj.username, password=password)
+            except User.DoesNotExist:
+                pass
+
         
         if user is not None:
             if not user.is_active:
@@ -75,6 +87,7 @@ class LoginView(APIView):
             {"error": "Credenciales inválidas."},
             status=status.HTTP_401_UNAUTHORIZED
         )
+
     
     # Añadir método OPTIONS para manejar solicitudes preflight explícitamente
     def options(self, request, *args, **kwargs):
