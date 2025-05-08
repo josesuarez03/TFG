@@ -40,10 +40,9 @@ export interface RegisterData {
 }
 
 export interface LoginCredentials {
-  email: string;
+  username_or_email: string;
   password: string;
 }
-
 export interface ProfileUpdateData {
   first_name?: string;
   last_name?: string;

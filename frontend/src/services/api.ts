@@ -3,7 +3,7 @@ import { LoginResponse } from '@/types/auth';
 import { UserProfile, RegisterData, LoginCredentials, ProfileUpdateData } from '@/types/user';
 
 // Define la URL base de la API
-const API_URL = 'https://localhost:8443/api/';
+const API_URL = 'http://localhost:8000/';
 
 const API = axios.create({
   baseURL: API_URL,
@@ -56,7 +56,7 @@ API.interceptors.response.use(
 
       try {
         // Intenta renovar el token
-        const response = await axios.post(`${API_URL}auth/refresh/`, { 
+        const response = await axios.post(`${API_URL}token/refresh/`, { 
           refresh: refreshToken 
         }, {
           headers: { 'Content-Type': 'application/json' }
@@ -94,7 +94,7 @@ export const login = async (credentials: LoginCredentials): Promise<LoginRespons
 
 export const loginWithGoogle = async (token: string, profile_type:string): Promise<LoginResponse> => {
   try {
-    const response = await API.post('google/login', { token, profile_type:profile_type });
+    const response = await API.post('google/login/', { token, profile_type:profile_type });
     if (response.status !== 200) {
         throw new Error('Error al iniciar sesión con Google');
         }

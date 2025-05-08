@@ -49,15 +49,15 @@ export function useAuth() {
     }
   }, []);
 
-  const login = useCallback(async (email: string, password: string) => {
+  const login = useCallback(async (username_or_email: string, password: string) => {
     try {
       setLoading(true);
       setError(null);
       
-      console.log('Intentando iniciar sesión con email:', email);
+      console.log('Intentando iniciar sesión con:', username_or_email);
       
       // Usar la función de login exportada desde api.ts
-      const loginData = await apiLogin({ email, password });
+      const loginData = await apiLogin({ username_or_email, password });
       
       console.log('Respuesta de login:', loginData);
       const { access, refresh } = loginData;
