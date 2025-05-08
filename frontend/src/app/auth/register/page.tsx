@@ -58,7 +58,7 @@ export default function Register() {
     const searchParams = useSearchParams();
     const type = searchParams.get('type');
     
-    const { login, loginWithGoogle, error: authError, loading: authLoading } = useAuth();
+    const { loginWithGoogle, error: authError, loading: authLoading } = useAuth();
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [googleError, setGoogleError] = useState<string | null>(null);
@@ -105,9 +105,7 @@ export default function Register() {
             
             // Intentar login automático después del registro
             try {
-                await login(data.email, data.password);
-                console.log('Login automático exitoso');
-                // No es necesario redireccionar aquí ya que useAuth ya lo hace
+                router.push(ROUTES.PUBLIC.LOGIN);
             } catch (loginErr) {
                 console.error('Error en login automático:', loginErr);
                 setError("Registro exitoso, pero hubo un problema al iniciar sesión automáticamente. Por favor, inicia sesión manualmente.");

@@ -57,7 +57,7 @@ export function useAuth() {
       console.log('Intentando iniciar sesión con:', username_or_email);
       
       // Usar la función de login exportada desde api.ts
-      const loginData = await apiLogin({ username_or_email, password });
+      const loginData = await apiLogin(username_or_email, password);
       
       console.log('Respuesta de login:', loginData);
       const { access, refresh } = loginData;

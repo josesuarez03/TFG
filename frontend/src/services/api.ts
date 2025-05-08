@@ -1,6 +1,6 @@
 import axios from 'axios';
 import { LoginResponse } from '@/types/auth';
-import { UserProfile, RegisterData, LoginCredentials, ProfileUpdateData } from '@/types/user';
+import { UserProfile, RegisterData, ProfileUpdateData } from '@/types/user';
 
 // Define la URL base de la API
 const API_URL = 'http://localhost:8000/';
@@ -82,8 +82,16 @@ API.interceptors.response.use(
 );
 
 // Función para iniciar sesión
-export const login = async (credentials: LoginCredentials): Promise<LoginResponse> => {
+export const login = async (username_or_email: string, password: string): Promise<LoginResponse> => {
   try {
+    // Determine if the input is an email or username
+    const isEmail = username_or_email.includes('@');
+    
+    // Send the appropriate field based on input type
+    const credentials = isEmail 
+      ? { email: username_or_email, password } 
+      : { username: username_or_email, password };
+    
     const response = await API.post('login/', credentials);
     return response.data;
   } catch (error) {
