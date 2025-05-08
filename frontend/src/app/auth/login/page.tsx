@@ -15,23 +15,18 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { TbMail, TbLock, TbUser, TbBrandGoogle, TbLoader, TbAlertTriangle, TbLogin } from 'react-icons/tb';
+import { TbLock, TbUser, TbBrandGoogle, TbLoader, TbAlertTriangle, TbLogin } from 'react-icons/tb';
 import { ROUTES } from '@/routes/routePaths';
 
 const loginSchema = z.object({
-  email: z.string()
-      .min(1, { message: 'El email es obligatorio' })
-      .email({ message: 'Email inválido' })
-      .regex(
-          /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/,
-          { message: 'El email debe tener un formato válido (ejemplo@dominio.com)' }
-      ),
+  username_or_email: z.string()
+      .min(1, { message: 'El usuario o email es obligatorio' }),
   password: z.string()
       .min(8, { message: 'La contraseña debe tener al menos 8 caracteres' })
       .regex(/[A-Z]/, { message: 'Debe contener al menos una letra mayúscula' })
       .regex(/[a-z]/, { message: 'Debe contener al menos una letra minúscula' })
       .regex(/[0-9]/, { message: 'Debe contener al menos un número' })
-      .regex(/[@$!%*?&]/, { message: 'Debe contener al menos un carácter especial (@$!%*?&)' })
+      .regex(/[@$!%*?&.]/, { message: 'Debe contener al menos un carácter especial (@$!%*?&.)' })
 });
 
 type LoginFormInputs = z.infer<typeof loginSchema>;
@@ -59,7 +54,7 @@ export default function Login() {
     // Manejo del formulario de inicio de sesión
     const onSubmit = async (data: LoginFormInputs) => {
         try {
-            await login(data.email, data.password);
+            await login(data.username_or_email, data.password);
         } catch (err) {
             console.error('Error al iniciar sesión:', err);
         }
@@ -157,11 +152,11 @@ export default function Login() {
             <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
               <div>
                 <Label className="flex items-center">
-                  <TbMail className="w-5 h-5 mr-2 text-gray-500" />
-                  Email
+                  <TbUser className="w-5 h-5 mr-2 text-gray-500" />
+                  Usuario o Email
                 </Label>
-                <Input type="email" {...register('email')} />
-                {errors.email && <p className="text-red-500 text-sm">{errors.email.message}</p>}
+                <Input type="text" {...register('username_or_email')} />
+                {errors.username_or_email && <p className="text-red-500 text-sm">{errors.username_or_email.message}</p>}
               </div>
               <div className="relative">
                   <Label className="flex items-center">
