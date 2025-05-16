@@ -21,25 +21,14 @@ export function middleware(request: NextRequest) {
   const isAuthenticated = authCookie === 'true';
   const isProfileCompleted = profileCompletedCookie === 'true';
   
-  // Define login path based on routes configuration
-  const loginPath = ROUTES.PUBLIC.LOGIN;
+  // Define important paths
   const dashboardPath = ROUTES.PROTECTED.DASHBOARD;
   const profileCompletePath = ROUTES.PROTECTED.PROFILE_COMPLETE;
+  const loginPath = ROUTES.PUBLIC.LOGIN;
 
-  // Handle root path `/`
-  if (pathname === '/') {
-    if (!isAuthenticated) {
-      // Redirect immediately to the login page
-      return NextResponse.redirect(new URL(loginPath, request.url));
-    }
-    
-    // If authenticated but not completed profile, redirect to profile completion
-    if (!isProfileCompleted) {
-      return NextResponse.redirect(new URL(profileCompletePath, request.url));
-    }
-    
-    // If authenticated and profile complete, redirect to the dashboard
-    return NextResponse.redirect(new URL(dashboardPath, request.url));
+  // Special handling for root and login paths - allow direct access without checks
+  if (pathname === '/' || pathname === ROUTES.PUBLIC.LOGIN) {
+    return NextResponse.next();
   }
   
   // Allow direct access to specific public pages without authentication
@@ -54,8 +43,9 @@ export function middleware(request: NextRequest) {
     return NextResponse.redirect(url);
   }
   
-  // Handle authenticated access to public routes
-  if (isAuthenticated && pathMatches(pathname, ROUTES.PUBLIC)) {
+  // Handle authenticated access to public routes (except root and login)
+  if (isAuthenticated && pathMatches(pathname, ROUTES.PUBLIC) && 
+      pathname !== '/' && pathname !== ROUTES.PUBLIC.LOGIN) {
     // If profile not completed, don't redirect to dashboard but to profile completion
     if (!isProfileCompleted) {
       return NextResponse.redirect(new URL(profileCompletePath, request.url));

@@ -11,16 +11,18 @@ export function useAppRouter() {
   const navigate = {
     // Public routes
     toLogin: (from?: string) => {
-      const path = ROUTES.PUBLIC.LOGIN;
+      // Podemos usar la ruta raíz para login o la ruta específica, aquí preferimos la raíz
+      const path = ROUTES.PUBLIC.ROOT_LOGIN;
       if (from) {
         router.push(`${path}?from=${encodeURIComponent(from)}`);
       } else {
         router.push(path);
       }
     },
-    toHome: () => router.push(ROUTES.PROTECTED.DASHBOARD),  // Will be redirected to login by middleware
+    toHome: () => router.push(ROUTES.PUBLIC.ROOT_LOGIN),  // Ahora la home es el login
     toRegister: () => router.push(ROUTES.PUBLIC.REGISTER),
     toProfileType: () => router.push(ROUTES.PUBLIC.PROFILE_TYPE),
+    toCompleteProfile: () => router.push(ROUTES.PUBLIC.COMPLETE_PROFILE),
     toRecoverPassword: (fromLogin = true) => {
       const path = ROUTES.PUBLIC.RECOVER_PASSWORD;
       if (fromLogin) {

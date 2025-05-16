@@ -1,9 +1,8 @@
-
-
 export const ROUTES = {
     // Public routes
     PUBLIC: {
-      LOGIN: '/auth/login',
+      LOGIN: '/auth/login', // Ruta alternativa para login
+      ROOT_LOGIN: '/', // Ruta raíz como login
       REGISTER: '/auth/register',
       PROFILE_TYPE: '/auth/profile-type',
       COMPLETE_PROFILE: '/auth/complete-profile',
