@@ -8,7 +8,7 @@ from .views import (
     PasswordResetVerifyView, ChangePasswordView, AccountDeleteView, 
     PatientHistoryCreateView, PatientHistoryViewSet, PatientViewSet,
     DoctorViewSet, PatientMeView, 
-    PatientMeHistoryView, DoctorPatientRelationViewSet, PatientMedicalDataUpdateView, LoginView
+    PatientMeHistoryView, DoctorPatientRelationViewSet, PatientMedicalDataUpdateView, LoginView, LogoutView
 )
 
 router = DefaultRouter()
@@ -21,7 +21,7 @@ router.register(r'doctor-patient-relations', DoctorPatientRelationViewSet, basen
 urlpatterns = [
     # Autenticación básica
     path('login/', LoginView.as_view(), name='login'),
-    path('logout/', include('dj_rest_auth.urls')),
+    path('logout/', LogoutView.as_view(), name='logout'),
     path('register/', RegisterUserView.as_view(), name='register'),
     path('token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
     path('token/verify/', TokenVerifyView.as_view(), name='token_verify'),
