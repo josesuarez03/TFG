@@ -19,7 +19,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import API from '@/services/api';
-import { useRouter } from 'next/router';
+import { useRouter } from 'next/navigation';
 import { useAuth } from '@/hooks/useAuth';
 import { useApiError } from '@/hooks/useApiError';
 import { TbTrash, TbAlertTriangle, TbArrowLeft, TbLock, TbAlertCircle } from "react-icons/tb";

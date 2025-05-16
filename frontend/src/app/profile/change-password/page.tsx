@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import API from '@/services/api';
-import { useRouter } from 'next/router';
+import { useRouter } from 'next/navigation';
 import { useApiError } from '@/hooks/useApiError';
 import { TbLock, TbLockOpen, TbDeviceFloppy, TbArrowLeft } from "react-icons/tb";
 import { ROUTES } from '@/routes/routePaths';
