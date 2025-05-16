@@ -99,35 +99,37 @@ class User(AbstractUser):
             self.oauth_uid = sanitize_input(self.oauth_uid)
         super().save(*args, **kwargs)
 
-class DoctorPatientRelation(models.Model):
+class Doctor(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    doctor = models.ForeignKey('Doctor', on_delete=models.CASCADE, related_name='patient_relations')
-    patient = models.ForeignKey('Patient', on_delete=models.CASCADE, related_name='doctor_relations')
-    is_primary_doctor = models.BooleanField(default=False, help_text="Indica si este doctor es el médico primario del paciente")
-    start_date = models.DateField(auto_now_add=True)
-    end_date = models.DateField(null=True, blank=True)
-    active = models.BooleanField(default=True)
-    notes = models.TextField(blank=True, null=True)
+    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='doctor')
+
+    # Información profesional (si es médico)
+    especialidad = models.CharField(max_length=100, blank=True, null=True)
+    numero_licencia = models.CharField(max_length=50, blank=True, null=True)
     
     class Meta:
-        unique_together = ('doctor', 'patient', 'active')
-        verbose_name = _('relación médico-paciente')
-        verbose_name_plural = _('relaciones médico-paciente')
+        verbose_name = _('doctor')
+        verbose_name_plural = _('doctores')
         
     def __str__(self):
-        return f"Dr. {self.doctor.user.last_name} - Paciente: {self.patient.user.last_name} ({self.start_date})"
+        return f"{self.user.email} ({self.user.get_tipo_display()})"
     
     def save(self, *args, **kwargs):
-        if self.notes:
-            self.notes = sanitize_input(self.notes)
+        # Asegurar que el tipo de usuario es doctor
+        if self.user.tipo != 'doctor':
+            self.user.tipo = 'doctor'
+            self.user.save(update_fields=['tipo'])
+
+        if self.especialidad:
+            self.especialidad = sanitize_input(self.especialidad)
+        if self.numero_licencia:
+            self.numero_licencia = sanitize_input(self.numero_licencia)
         super().save(*args, **kwargs)
 
 class Patient(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='patient')
     
-    # Relación con doctores - Un paciente puede tener varios doctores
-    doctors = models.ManyToManyField('Doctor', through=DoctorPatientRelation, related_name='patients')
 
     # Campos que pueden ser completados por el chatbot
     triaje_level = models.CharField(max_length=20, blank=True, null=True)
@@ -232,32 +234,28 @@ class Patient(models.Model):
                 return True
         
         return False
-    
-class Doctor(models.Model):
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='doctor')
 
-    # Información profesional (si es médico)
-    especialidad = models.CharField(max_length=100, blank=True, null=True)
-    numero_licencia = models.CharField(max_length=50, blank=True, null=True)
+class DoctorPatientRelation(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    doctor = models.ForeignKey('Doctor', on_delete=models.CASCADE, related_name='patient_relations')
+    patient = models.ForeignKey('Patient', on_delete=models.CASCADE, related_name='doctor_relations')
+    is_primary_doctor = models.BooleanField(default=False, help_text="Indica si este doctor es el médico primario del paciente")
+    start_date = models.DateField(auto_now_add=True)
+    end_date = models.DateField(null=True, blank=True)
+    active = models.BooleanField(default=True)
+    notes = models.TextField(blank=True, null=True)
     
     class Meta:
-        verbose_name = _('doctor')
-        verbose_name_plural = _('doctores')
+        unique_together = ('doctor', 'patient', 'active')
+        verbose_name = _('relación médico-paciente')
+        verbose_name_plural = _('relaciones médico-paciente')
         
     def __str__(self):
-        return f"{self.user.email} ({self.user.get_tipo_display()})"
+        return f"Dr. {self.doctor.user.last_name} - Paciente: {self.patient.user.last_name} ({self.start_date})"
     
     def save(self, *args, **kwargs):
-        # Asegurar que el tipo de usuario es doctor
-        if self.user.tipo != 'doctor':
-            self.user.tipo = 'doctor'
-            self.user.save(update_fields=['tipo'])
-
-        if self.especialidad:
-            self.especialidad = sanitize_input(self.especialidad)
-        if self.numero_licencia:
-            self.numero_licencia = sanitize_input(self.numero_licencia)
+        if self.notes:
+            self.notes = sanitize_input(self.notes)
         super().save(*args, **kwargs)
 
 class PatientHistoryEntry(models.Model):

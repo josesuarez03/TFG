@@ -16,4 +16,4 @@ RUN pip install --no-cache-dir -r requirements.txt
 EXPOSE 8000
 
 # Comando para ejecutar el servidor de desarrollo de Django
-CMD ["sh", "-c", "python manage.py migrate && python manage.py runserver 0.0.0.0:8000"]
+CMD ["sh", "-c", "python manage.py makemigrations users && python manage.py migrate && python manage.py runserver 0.0.0.0:8000"]

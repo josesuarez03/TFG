@@ -200,12 +200,6 @@ class CompleteProfileView(generics.UpdateAPIView):
                 if field in serializer.validated_data:
                     setattr(user, field, serializer.validated_data[field])
             
-            # Actualizar first_name y last_name si se proporcionan
-            if 'first_name' in request.data:
-                user.first_name = request.data['first_name']
-            if 'last_name' in request.data:
-                user.last_name = request.data['last_name']
-            
             user.save()
             
             # Actualizar o crear el perfil de paciente si es necesario
@@ -227,7 +221,11 @@ class CompleteProfileView(generics.UpdateAPIView):
                 doctor.save()
                 
             # Verificar si el perfil está completo
-            user.check_profile_completion()
+            if 'is_profile_completed' in request.data and request.data['is_profile_completed'] is True:
+                user.is_profile_completed = True
+                user.save(update_fields=['is_profile_completed'])
+            else:
+                user.check_profile_completion()
             
             return Response({
                 'user': UserProfileSerializer(user).data,
