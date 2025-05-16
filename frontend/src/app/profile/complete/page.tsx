@@ -15,7 +15,7 @@ import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { completeProfile } from '@/services/api'; // Import the new function
-import { TbCalendarTime, TbPhone, TbMapPin, TbGenderBigender, TbBriefcase, TbAlertTriangle, TbStethoscope, TbLicense, TbCheck, TbLoader,TbUser,TbCircleX} from "react-icons/tb";
+import { TbCalendarTime, TbPhone, TbMapPin, TbGenderBigender, TbBriefcase, TbAlertTriangle, TbStethoscope, TbLicense, TbCheck, TbLoader, TbUser, TbCircleX } from "react-icons/tb";
 import { ROUTES } from '@/routes/routePaths';
 import { useApiError } from '@/hooks/useApiError';
 
@@ -110,20 +110,20 @@ export default function CompleteProfile() {
 
         try {
             console.log('Enviando datos del formulario:', data);
-            
+
             // Añadir el campo is_profile_completed a los datos enviados
             const completeData = {
                 ...data,
                 is_profile_completed: true
             };
-            
+
             // Usar la función dedicada para completar el perfil
             await completeProfile(completeData);
             setSuccess(true);
-            
+
             // Actualizar el perfil de usuario después de completarlo
             await refreshProfile();
-            
+
             setTimeout(() => {
                 router.push(ROUTES.PROTECTED.DASHBOARD);
             }, 1500);
@@ -149,237 +149,233 @@ export default function CompleteProfile() {
     // Mostrar mensaje si el usuario no está autenticado
     if (!user) {
         return (
-            <div className="flex flex-col justify-center items-center h-screen bg-gray-50 p-4">
-                <Card className="w-full max-w-md shadow-lg">
-                    <CardContent className="pt-6">
-                        <div className="flex flex-col items-center text-center space-y-4">
-                            <TbCircleX className="h-16 w-16 text-red-500" />
-                            <h2 className="text-xl font-semibold">Acceso Denegado</h2>
-                            <p className="text-gray-600">
-                                Debes iniciar sesión para completar tu perfil.
-                            </p>
-                            <Button
-                                onClick={() => router.push(ROUTES.PUBLIC.LOGIN)}
-                                className="mt-4"
-                            >
-                                <TbUser className="h-5 w-5 mr-2" />
-                                Iniciar Sesión
-                            </Button>
-                        </div>
-                    </CardContent>
-                </Card>
-            </div>
+            <Card className="w-full max-w-md shadow-lg">
+                <CardContent className="pt-6">
+                    <div className="flex flex-col items-center text-center space-y-4">
+                        <TbCircleX className="h-16 w-16 text-red-500" />
+                        <h2 className="text-xl font-semibold">Acceso Denegado</h2>
+                        <p className="text-gray-600">
+                            Debes iniciar sesión para completar tu perfil.
+                        </p>
+                        <Button
+                            onClick={() => router.push(ROUTES.PUBLIC.LOGIN)}
+                            className="mt-4"
+                        >
+                            <TbUser className="h-5 w-5 mr-2" />
+                            Iniciar Sesión
+                        </Button>
+                    </div>
+                </CardContent>
+            </Card>
         );
     }
 
     return (
-        <div className="min-h-screen bg-gray-50 py-8 px-4">
-            <Card className="w-full max-w-lg mx-auto shadow-lg">
-                <CardHeader className="pb-2">
-                    <div className="flex flex-col items-center">
-                        <Image
-                            src="/assets/img/logo.png"
-                            alt="Logo"
-                            width={80}
-                            height={80}
-                            className="mb-3"
-                        />
-                        <CardTitle className="text-2xl font-bold text-center">
-                            Completa tu Perfil
-                        </CardTitle>
-                        <p className="text-gray-500 text-center mt-1">
-                            {user.tipo === 'patient' 
-                                ? 'Necesitamos algunos datos para personalizar tu experiencia'
-                                : 'Necesitamos información sobre tu práctica médica'}
-                        </p>
-                    </div>
-                </CardHeader>
-                <CardContent className="pt-4">
-                    {error && (
-                        <Alert variant="destructive" className="mb-4">
-                            <AlertDescription className="flex items-center">
-                                <TbCircleX className="h-5 w-5 mr-2" />
-                                {error.message}
-                            </AlertDescription>
-                        </Alert>
-                    )}
-                    
-                    {success && (
-                        <Alert className="mb-4 bg-green-50 border-green-500">
-                            <AlertDescription className="text-green-700 flex items-center">
-                                <TbCheck className="h-5 w-5 mr-2 text-green-500" />
-                                ¡Perfil actualizado correctamente! Redirigiendo...
-                            </AlertDescription>
-                        </Alert>
-                    )}
-                    
-                    <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-                        <div className="space-y-4">
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                {/* Información básica del usuario */}
-                                <div>
-                                    <Label className="flex items-center mb-1.5">
-                                        <TbCalendarTime className="h-4 w-4 mr-2 text-gray-500" />
-                                        Fecha de Nacimiento <span className="text-red-500 ml-1">*</span>
-                                    </Label>
-                                    <Input 
-                                        type="date" 
-                                        {...register('fecha_nacimiento')} 
-                                        className={errors.fecha_nacimiento ? "border-red-300" : ""}
-                                    />
-                                    {errors.fecha_nacimiento && (
-                                        <p className="text-red-500 text-sm mt-1">{errors.fecha_nacimiento.message}</p>
-                                    )}
-                                </div>
-                                
-                                <div>
-                                    <Label className="flex items-center mb-1.5">
-                                        <TbGenderBigender className="h-4 w-4 mr-2 text-gray-500" />
-                                        Género <span className="text-red-500 ml-1">*</span>
-                                    </Label>
-                                    <Controller
-                                        name="genero"
-                                        control={control}
-                                        render={({ field }) => (
-                                            <Select 
-                                                onValueChange={field.onChange} 
-                                                value={field.value}
-                                            >
-                                                <SelectTrigger className={errors.genero ? "border-red-300" : ""}>
-                                                    <SelectValue placeholder="Selecciona tu género" />
-                                                </SelectTrigger>
-                                                <SelectContent>
-                                                    <SelectItem value="masculino">Masculino</SelectItem>
-                                                    <SelectItem value="femenino">Femenino</SelectItem>
-                                                    <SelectItem value="otro">Otro</SelectItem>
-                                                    <SelectItem value="prefiero_no_decir">Prefiero no decir</SelectItem>
-                                                </SelectContent>
-                                            </Select>
-                                        )}
-                                    />
-                                    {errors.genero && (
-                                        <p className="text-red-500 text-sm mt-1">{errors.genero.message}</p>
-                                    )}
-                                </div>
+        <Card className="w-full max-w-lg mx-auto shadow-lg">
+            <CardHeader className="pb-2">
+                <div className="flex flex-col items-center">
+                    <Image
+                        src="/assets/img/logo.png"
+                        alt="Logo"
+                        width={80}
+                        height={80}
+                        className="mb-3"
+                    />
+                    <CardTitle className="text-2xl font-bold text-center">
+                        Completa tu Perfil
+                    </CardTitle>
+                    <p className="text-gray-500 text-center mt-1">
+                        {user.tipo === 'patient'
+                            ? 'Necesitamos algunos datos para personalizar tu experiencia'
+                            : 'Necesitamos información sobre tu práctica médica'}
+                    </p>
+                </div>
+            </CardHeader>
+            <CardContent className="pt-4">
+                {error && (
+                    <Alert variant="destructive" className="mb-4">
+                        <AlertDescription className="flex items-center">
+                            <TbCircleX className="h-5 w-5 mr-2" />
+                            {error.message}
+                        </AlertDescription>
+                    </Alert>
+                )}
+
+                {success && (
+                    <Alert className="mb-4 bg-green-50 border-green-500">
+                        <AlertDescription className="text-green-700 flex items-center">
+                            <TbCheck className="h-5 w-5 mr-2 text-green-500" />
+                            ¡Perfil actualizado correctamente! Redirigiendo...
+                        </AlertDescription>
+                    </Alert>
+                )}
+
+                <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+                    <div className="space-y-4">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            {/* Información básica del usuario */}
+                            <div>
+                                <Label className="flex items-center mb-1.5">
+                                    <TbCalendarTime className="h-4 w-4 mr-2 text-gray-500" />
+                                    Fecha de Nacimiento <span className="text-red-500 ml-1">*</span>
+                                </Label>
+                                <Input
+                                    type="date"
+                                    {...register('fecha_nacimiento')}
+                                    className={errors.fecha_nacimiento ? "border-red-300" : ""}
+                                />
+                                {errors.fecha_nacimiento && (
+                                    <p className="text-red-500 text-sm mt-1">{errors.fecha_nacimiento.message}</p>
+                                )}
                             </div>
 
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <Label className="flex items-center mb-1.5">
+                                    <TbGenderBigender className="h-4 w-4 mr-2 text-gray-500" />
+                                    Género <span className="text-red-500 ml-1">*</span>
+                                </Label>
+                                <Controller
+                                    name="genero"
+                                    control={control}
+                                    render={({ field }) => (
+                                        <Select
+                                            onValueChange={field.onChange}
+                                            value={field.value}
+                                        >
+                                            <SelectTrigger className={errors.genero ? "border-red-300" : ""}>
+                                                <SelectValue placeholder="Selecciona tu género" />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem value="masculino">Masculino</SelectItem>
+                                                <SelectItem value="femenino">Femenino</SelectItem>
+                                                <SelectItem value="otro">Otro</SelectItem>
+                                                <SelectItem value="prefiero_no_decir">Prefiero no decir</SelectItem>
+                                            </SelectContent>
+                                        </Select>
+                                    )}
+                                />
+                                {errors.genero && (
+                                    <p className="text-red-500 text-sm mt-1">{errors.genero.message}</p>
+                                )}
+                            </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <Label className="flex items-center mb-1.5">
+                                    <TbPhone className="h-4 w-4 mr-2 text-gray-500" />
+                                    Teléfono <span className="text-red-500 ml-1">*</span>
+                                </Label>
+                                <Input
+                                    {...register('telefono')}
+                                    placeholder="10 dígitos"
+                                    className={errors.telefono ? "border-red-300" : ""}
+                                />
+                                {errors.telefono && (
+                                    <p className="text-red-500 text-sm mt-1">{errors.telefono.message}</p>
+                                )}
+                            </div>
+
+                            <div>
+                                <Label className="flex items-center mb-1.5">
+                                    <TbMapPin className="h-4 w-4 mr-2 text-gray-500" />
+                                    Dirección <span className="text-red-500 ml-1">*</span>
+                                </Label>
+                                <Input
+                                    {...register('direccion')}
+                                    placeholder="Tu dirección"
+                                    className={errors.direccion ? "border-red-300" : ""}
+                                />
+                                {errors.direccion && (
+                                    <p className="text-red-500 text-sm mt-1">{errors.direccion.message}</p>
+                                )}
+                            </div>
+                        </div>
+
+                        {/* Campos específicos para pacientes */}
+                        {user.tipo === 'patient' && (
+                            <div className="space-y-4 pt-2">
+                                <h3 className="text-sm font-medium text-gray-500">INFORMACIÓN ADICIONAL</h3>
                                 <div>
                                     <Label className="flex items-center mb-1.5">
-                                        <TbPhone className="h-4 w-4 mr-2 text-gray-500" />
-                                        Teléfono <span className="text-red-500 ml-1">*</span>
+                                        <TbBriefcase className="h-4 w-4 mr-2 text-gray-500" />
+                                        Ocupación
                                     </Label>
-                                    <Input 
-                                        {...register('telefono')} 
-                                        placeholder="10 dígitos"
-                                        className={errors.telefono ? "border-red-300" : ""}
+                                    <Input
+                                        {...register('ocupacion')}
+                                        placeholder="Tu ocupación (opcional)"
                                     />
-                                    {errors.telefono && (
-                                        <p className="text-red-500 text-sm mt-1">{errors.telefono.message}</p>
+                                </div>
+                                <div>
+                                    <Label className="flex items-center mb-1.5">
+                                        <TbAlertTriangle className="h-4 w-4 mr-2 text-gray-500" />
+                                        Alergias
+                                    </Label>
+                                    <Textarea
+                                        {...register('allergies')}
+                                        placeholder="Describe tus alergias (opcional)"
+                                        className="resize-none"
+                                        rows={3}
+                                    />
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Campos específicos para doctores */}
+                        {user.tipo === 'doctor' && (
+                            <div className="space-y-4 pt-2">
+                                <h3 className="text-sm font-medium text-gray-500">INFORMACIÓN PROFESIONAL</h3>
+                                <div>
+                                    <Label className="flex items-center mb-1.5">
+                                        <TbStethoscope className="h-4 w-4 mr-2 text-gray-500" />
+                                        Especialidad <span className="text-red-500 ml-1">*</span>
+                                    </Label>
+                                    <Input
+                                        {...register('especialidad')}
+                                        placeholder="Tu especialidad médica"
+                                        className={errors.especialidad ? "border-red-300" : ""}
+                                    />
+                                    {errors.especialidad && (
+                                        <p className="text-red-500 text-sm mt-1">{errors.especialidad?.message}</p>
                                     )}
                                 </div>
-                                
                                 <div>
                                     <Label className="flex items-center mb-1.5">
-                                        <TbMapPin className="h-4 w-4 mr-2 text-gray-500" />
-                                        Dirección <span className="text-red-500 ml-1">*</span>
+                                        <TbLicense className="h-4 w-4 mr-2 text-gray-500" />
+                                        Número de Licencia <span className="text-red-500 ml-1">*</span>
                                     </Label>
-                                    <Input 
-                                        {...register('direccion')} 
-                                        placeholder="Tu dirección"
-                                        className={errors.direccion ? "border-red-300" : ""}
+                                    <Input
+                                        {...register('numero_licencia')}
+                                        placeholder="Número de licencia profesional"
+                                        className={errors.numero_licencia ? "border-red-300" : ""}
                                     />
-                                    {errors.direccion && (
-                                        <p className="text-red-500 text-sm mt-1">{errors.direccion.message}</p>
+                                    {errors.numero_licencia && (
+                                        <p className="text-red-500 text-sm mt-1">{errors.numero_licencia?.message}</p>
                                     )}
                                 </div>
                             </div>
-                            
-                            {/* Campos específicos para pacientes */}
-                            {user.tipo === 'patient' && (
-                                <div className="space-y-4 pt-2">
-                                    <h3 className="text-sm font-medium text-gray-500">INFORMACIÓN ADICIONAL</h3>
-                                    <div>
-                                        <Label className="flex items-center mb-1.5">
-                                            <TbBriefcase className="h-4 w-4 mr-2 text-gray-500" />
-                                            Ocupación
-                                        </Label>
-                                        <Input 
-                                            {...register('ocupacion')} 
-                                            placeholder="Tu ocupación (opcional)"
-                                        />
-                                    </div>
-                                    <div>
-                                        <Label className="flex items-center mb-1.5">
-                                            <TbAlertTriangle className="h-4 w-4 mr-2 text-gray-500" />
-                                            Alergias
-                                        </Label>
-                                        <Textarea 
-                                            {...register('allergies')} 
-                                            placeholder="Describe tus alergias (opcional)"
-                                            className="resize-none"
-                                            rows={3}
-                                        />
-                                    </div>
-                                </div>
-                            )}
-                            
-                            {/* Campos específicos para doctores */}
-                            {user.tipo === 'doctor' && (
-                                <div className="space-y-4 pt-2">
-                                    <h3 className="text-sm font-medium text-gray-500">INFORMACIÓN PROFESIONAL</h3>
-                                    <div>
-                                        <Label className="flex items-center mb-1.5">
-                                            <TbStethoscope className="h-4 w-4 mr-2 text-gray-500" />
-                                            Especialidad <span className="text-red-500 ml-1">*</span>
-                                        </Label>
-                                        <Input 
-                                            {...register('especialidad')} 
-                                            placeholder="Tu especialidad médica"
-                                            className={errors.especialidad ? "border-red-300" : ""}
-                                        />
-                                        {errors.especialidad && (
-                                            <p className="text-red-500 text-sm mt-1">{errors.especialidad?.message}</p>
-                                        )}
-                                    </div>
-                                    <div>
-                                        <Label className="flex items-center mb-1.5">
-                                            <TbLicense className="h-4 w-4 mr-2 text-gray-500" />
-                                            Número de Licencia <span className="text-red-500 ml-1">*</span>
-                                        </Label>
-                                        <Input 
-                                            {...register('numero_licencia')} 
-                                            placeholder="Número de licencia profesional"
-                                            className={errors.numero_licencia ? "border-red-300" : ""}
-                                        />
-                                        {errors.numero_licencia && (
-                                            <p className="text-red-500 text-sm mt-1">{errors.numero_licencia?.message}</p>
-                                        )}
-                                    </div>
-                                </div>
-                            )}
-                        </div>
-                        
-                        <Button
-                            type="submit"
-                            disabled={loading}
-                            className="w-full mt-6"
-                        >
-                            {loading ? (
-                                <div className="flex items-center justify-center">
-                                    <TbLoader className="animate-spin h-5 w-5 mr-3" />
-                                    <span>Guardando...</span>
-                                </div>
-                            ) : (
-                                <div className="flex items-center justify-center">
-                                    <TbCheck className="h-5 w-5 mr-2" />
-                                    <span>Guardar y Continuar</span>
-                                </div>
-                            )}
-                        </Button>
-                    </form>
-                </CardContent>
-            </Card>
-        </div>
+                        )}
+                    </div>
+
+                    <Button
+                        type="submit"
+                        disabled={loading}
+                        className="w-full mt-6"
+                    >
+                        {loading ? (
+                            <div className="flex items-center justify-center">
+                                <TbLoader className="animate-spin h-5 w-5 mr-3" />
+                                <span>Guardando...</span>
+                            </div>
+                        ) : (
+                            <div className="flex items-center justify-center">
+                                <TbCheck className="h-5 w-5 mr-2" />
+                                <span>Guardar y Continuar</span>
+                            </div>
+                        )}
+                    </Button>
+                </form>
+            </CardContent>
+        </Card>
     );
 }
