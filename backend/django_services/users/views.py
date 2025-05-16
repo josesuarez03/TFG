@@ -183,13 +183,24 @@ class GoogleOAuthLoginView(APIView):
         response["Access-Control-Allow-Headers"] = "Content-Type, Authorization"
         return response
 
-class CompleteProfileView(generics.UpdateAPIView):
+class CompleteProfileView(generics.GenericAPIView):
     """Vista para completar información adicional después del registro/login con OAuth"""
     serializer_class = RequiredOAuthUserSerializer
     permission_classes = [IsAuthenticated]
     
     def get_object(self):
         return self.request.user
+    
+    # Añadir soporte para método POST
+    def post(self, request, *args, **kwargs):
+        return self.update(request, *args, **kwargs)
+        
+    # Mantener soporte para PUT/PATCH
+    def put(self, request, *args, **kwargs):
+        return self.update(request, *args, **kwargs)
+        
+    def patch(self, request, *args, **kwargs):
+        return self.update(request, *args, **kwargs)
     
     def update(self, request, *args, **kwargs):
         user = self.get_object()
