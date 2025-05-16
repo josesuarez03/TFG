@@ -14,14 +14,15 @@ import {
   TbClipboardList
 } from "react-icons/tb";
 import { useAuth } from "@/hooks/useAuth";
-import { useRouter } from "next/router";
+import { usePathname } from "next/navigation";
 import { ROUTES, NAVIGATION_ITEMS } from "@/routes/routePaths";
-import ThemeToggle from "./theme-toggle"; // Importamos el componente ThemeToggle
+import ThemeToggle from "./theme-toggle";
+import { useTheme } from "next-themes";
+import { logout as apiLogout } from "@/services/api";
 
 // Mapa de iconos para las rutas
 const iconMap: Record<string, React.ReactNode> = {
   'HomeIcon': <TbHome />,
-  'UserIcon': <TbUserCircle />,
   'ChatBubbleOvalLeftIcon': <TbMessageCircle />,
   'ClipboardDocumentListIcon': <TbReportMedical />,
   'UserGroupIcon': <TbUserPlus />,
@@ -32,14 +33,22 @@ const iconMap: Record<string, React.ReactNode> = {
 export default function Sidebar() {
     const [isExpanded, setIsExpanded] = useState(true);
     const { user, logout, isAuthenticated } = useAuth();
-    const router = useRouter();
+    const pathname = usePathname();
+    const { theme, setTheme } = useTheme();
 
     const toggleSidebar = () => {
         setIsExpanded(!isExpanded);
     };
 
-    const handleLogout = () => {
-        logout();
+    const handleLogout = async () => {
+        try {
+            await apiLogout();
+            logout();
+        } catch (error) {
+            console.error("Error al cerrar sesión:", error);
+            // Intentar logout local de todas formas
+            logout();
+        }
     };
 
     const getFullName = () => {
@@ -76,11 +85,12 @@ export default function Sidebar() {
     // Verificar si el usuario es médico
     const isDoctor = user?.tipo === 'doctor';
 
+
     return (
         <div
-            className={`h-screen bg-gray-800 text-white transition-all duration-300 flex flex-col justify-between ${
+            className={`h-screen text-white transition-all duration-300 flex flex-col justify-between ${
                 isExpanded ? "w-64" : "w-16"
-            }`}
+            } ${theme === 'dark' ? 'bg-gray-800' : 'bg-blue-800'}`}
         >
             <div>
                 {/* Botón para expandir/colapsar */}
@@ -95,19 +105,23 @@ export default function Sidebar() {
                     </Button>
                 </div>
 
-                {/* Avatar del usuario */}
-                <div className="flex items-center p-4 space-x-4">
-                    <div className="flex items-center">
-                        <TbUserCircle size={32} className="text-white" />
-                        {isExpanded && (
-                            <div className="ml-2">
-                                <span className="text-sm font-medium block">{getFullName()}</span>
-                                {isDoctor && <span className="text-xs text-blue-300">Doctor</span>}
-                                {!isDoctor && <span className="text-xs text-green-300">Paciente</span>}
-                            </div>
-                        )}
+                {/* Avatar del usuario como enlace al perfil */}
+                <Link href={ROUTES.PROTECTED.PROFILE}>
+                    <div className={`flex items-center p-4 space-x-4 hover:bg-opacity-20 hover:bg-gray-700 rounded-md mx-2 ${
+                        pathname === ROUTES.PROTECTED.PROFILE ? (theme === 'dark' ? "bg-gray-700" : "bg-blue-700") : ""
+                    }`}>
+                        <div className="flex items-center">
+                            <TbUserCircle size={32} className="text-white" />
+                            {isExpanded && (
+                                <div className="ml-2">
+                                    <span className="text-sm font-medium block">{getFullName()}</span>
+                                    {isDoctor && <span className="text-xs text-blue-300">Doctor</span>}
+                                    {!isDoctor && <span className="text-xs text-green-300">Paciente</span>}
+                                </div>
+                            )}
+                        </div>
                     </div>
-                </div>
+                </Link>
 
                 {/* Menú principal */}
                 <nav className="mt-4 space-y-2">
@@ -115,8 +129,8 @@ export default function Sidebar() {
                         <Link
                             key={index}
                             href={item.path}
-                            className={`flex items-center space-x-4 p-3 hover:bg-gray-700 rounded-md mx-2 ${
-                                router.pathname === item.path ? "bg-gray-700" : ""
+                            className={`flex items-center space-x-4 p-3 hover:bg-opacity-20 hover:bg-gray-700 rounded-md mx-2 ${
+                                pathname === item.path ? (theme === 'dark' ? "bg-gray-700" : "bg-blue-700") : ""
                             }`}
                         >
                             <span className="text-xl">{getIcon(item.icon)}</span>
@@ -131,9 +145,9 @@ export default function Sidebar() {
                                 <Link
                                     key={`doctor-${index}`}
                                     href={item.path}
-                                    className={`flex items-center space-x-4 p-3 hover:bg-gray-700 rounded-md mx-2 ${
-                                        router.pathname === item.path ? "bg-gray-700" : ""
-                                    } ${isExpanded ? "bg-blue-900/30 hover:bg-blue-800/40" : ""}`}
+                                    className={`flex items-center space-x-4 p-3 hover:bg-opacity-20 hover:bg-gray-700 rounded-md mx-2 ${
+                                        pathname === item.path ? (theme === 'dark' ? "bg-gray-700" : "bg-blue-700") : ""
+                                    } ${isExpanded ? (theme === 'dark' ? "bg-blue-900/30 hover:bg-blue-800/40" : "bg-blue-950/30 hover:bg-blue-900/40") : ""}`}
                                 >
                                     <span className="text-xl text-blue-300">{getIcon(item.icon)}</span>
                                     {isExpanded && <span className="text-sm font-medium text-blue-300">{item.name}</span>}
@@ -144,33 +158,27 @@ export default function Sidebar() {
                 </nav>
             </div>
 
-            {/* Footer con botón de perfil, tema y logout */}
+            {/* Footer con botón de tema y logout */}
             <div className="mt-auto mb-4 space-y-2">
-                <Link 
-                    href={ROUTES.PROTECTED.PROFILE}
-                    className={`flex items-center space-x-4 p-3 hover:bg-gray-700 rounded-md mx-2 ${
-                        router.pathname === ROUTES.PROTECTED.PROFILE ? "bg-gray-700" : ""
-                    }`}
-                >
-                    <span className="text-xl"><TbUserCircle /></span>
-                    {isExpanded && <span className="text-sm">Perfil</span>}
-                </Link>
-                
-                {/* Componente de ThemeToggle */}
-                <div className={`flex items-center p-3 hover:bg-gray-700 rounded-md mx-2`}>
-                {isExpanded && (
-                    <div className="flex items-center p-3 hover:bg-gray-700 rounded-md mx-2">
+                {/* ThemeToggle con texto */}
+                <div className="flex items-center p-3 hover:bg-opacity-20 hover:bg-gray-700 rounded-md mx-2">
+                    {isExpanded ? (
                         <div className="flex items-center justify-between w-full">
-                            <ThemeToggle />
+                            <div className="flex items-center">
+                                <ThemeToggle />
+                                <span className="text-sm ml-2">Cambiar tema</span>
+                            </div>
                         </div>
-                    </div>
-                )}
+                    ) : (
+                        <ThemeToggle />
+                    )}
                 </div>
                 
+                {/* Botón de logout */}
                 <Button
                     variant="ghost"
                     size="sm"
-                    className="flex items-center space-x-4 p-3 hover:bg-gray-700 rounded-md mx-2 w-full justify-start"
+                    className="flex items-center space-x-4 p-3 hover:bg-opacity-20 hover:bg-gray-700 rounded-md mx-2 w-full justify-start"
                     onClick={handleLogout}
                 >
                     <span className="text-xl"><TbLogout /></span>

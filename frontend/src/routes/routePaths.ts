@@ -35,7 +35,6 @@ export const ROUTES = {
     // Main navigation
     main: [
       { name: 'Dashboard', path: ROUTES.PROTECTED.DASHBOARD, icon: 'HomeIcon' },
-      { name: 'Profile', path: ROUTES.PROTECTED.PROFILE, icon: 'UserIcon' },
       { name: 'Chat', path: ROUTES.PROTECTED.CHAT, icon: 'ChatBubbleOvalLeftIcon' },
       { name: 'Medical Data', path: ROUTES.PROTECTED.MEDICAL_DATA, icon: 'ClipboardDocumentListIcon' },
     ],

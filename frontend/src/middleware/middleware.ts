@@ -19,10 +19,12 @@ export function middleware(request: NextRequest) {
   const profileCompletedCookie = request.cookies.get('isProfileCompleted')?.value;
   
   const isAuthenticated = authCookie === 'true';
+  const isProfileCompleted = profileCompletedCookie === 'true';
   
   // Define login path based on routes configuration
   const loginPath = ROUTES.PUBLIC.LOGIN;
   const dashboardPath = ROUTES.PROTECTED.DASHBOARD;
+  const profileCompletePath = ROUTES.PROTECTED.PROFILE_COMPLETE;
 
   // Handle root path `/`
   if (pathname === '/') {
@@ -30,7 +32,13 @@ export function middleware(request: NextRequest) {
       // Redirect immediately to the login page
       return NextResponse.redirect(new URL(loginPath, request.url));
     }
-    // If authenticated, redirect to the dashboard
+    
+    // If authenticated but not completed profile, redirect to profile completion
+    if (!isProfileCompleted) {
+      return NextResponse.redirect(new URL(profileCompletePath, request.url));
+    }
+    
+    // If authenticated and profile complete, redirect to the dashboard
     return NextResponse.redirect(new URL(dashboardPath, request.url));
   }
   
@@ -48,6 +56,10 @@ export function middleware(request: NextRequest) {
   
   // Handle authenticated access to public routes
   if (isAuthenticated && pathMatches(pathname, ROUTES.PUBLIC)) {
+    // If profile not completed, don't redirect to dashboard but to profile completion
+    if (!isProfileCompleted) {
+      return NextResponse.redirect(new URL(profileCompletePath, request.url));
+    }
     return NextResponse.redirect(new URL(dashboardPath, request.url));
   }
   
@@ -56,9 +68,9 @@ export function middleware(request: NextRequest) {
     return NextResponse.redirect(new URL(dashboardPath, request.url));
   }
   
-  // Check profile completion
-  if (isAuthenticated && pathname !== ROUTES.PROTECTED.PROFILE_COMPLETE && profileCompletedCookie === 'false') {
-    return NextResponse.redirect(new URL(ROUTES.PROTECTED.PROFILE_COMPLETE, request.url));
+  // Check profile completion - don't redirect if they're already on the profile complete page
+  if (isAuthenticated && !isProfileCompleted && pathname !== profileCompletePath) {
+    return NextResponse.redirect(new URL(profileCompletePath, request.url));
   }
   
   return NextResponse.next();
