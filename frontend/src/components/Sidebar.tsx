@@ -90,7 +90,7 @@ export default function Sidebar() {
         <div
             className={`h-screen text-white transition-all duration-300 flex flex-col justify-between ${
                 isExpanded ? "w-64" : "w-16"
-            } ${theme === 'dark' ? 'bg-gray-800' : 'bg-blue-800'}`}
+            } ${theme === 'dark' ? 'bg-blue-dark' : 'bg-blue-primary'}`}
         >
             <div>
                 {/* Botón para expandir/colapsar */}
@@ -108,15 +108,15 @@ export default function Sidebar() {
                 {/* Avatar del usuario como enlace al perfil */}
                 <Link href={ROUTES.PROTECTED.PROFILE}>
                     <div className={`flex items-center p-4 space-x-4 hover:bg-opacity-20 hover:bg-gray-700 rounded-md mx-2 ${
-                        pathname === ROUTES.PROTECTED.PROFILE ? (theme === 'dark' ? "bg-gray-700" : "bg-blue-700") : ""
+                        pathname === ROUTES.PROTECTED.PROFILE ? (theme === 'dark' ? "bg-blue-violet/70" : "bg-blue-medium/70") : ""
                     }`}>
                         <div className="flex items-center">
                             <TbUserCircle size={32} className="text-white" />
                             {isExpanded && (
                                 <div className="ml-2">
                                     <span className="text-sm font-medium block">{getFullName()}</span>
-                                    {isDoctor && <span className="text-xs text-blue-300">Doctor</span>}
-                                    {!isDoctor && <span className="text-xs text-green-300">Paciente</span>}
+                                    {isDoctor && <span className="text-xs text-blue-sky">Doctor</span>}
+                                    {!isDoctor && <span className="text-xs text-gray-light">Paciente</span>}
                                 </div>
                             )}
                         </div>
@@ -130,7 +130,7 @@ export default function Sidebar() {
                             key={index}
                             href={item.path}
                             className={`flex items-center space-x-4 p-3 hover:bg-opacity-20 hover:bg-gray-700 rounded-md mx-2 ${
-                                pathname === item.path ? (theme === 'dark' ? "bg-gray-700" : "bg-blue-700") : ""
+                                pathname === item.path ? (theme === 'dark' ? "bg-blue-violet/70" : "bg-blue-medium/70") : ""
                             }`}
                         >
                             <span className="text-xl">{getIcon(item.icon)}</span>
@@ -146,11 +146,11 @@ export default function Sidebar() {
                                     key={`doctor-${index}`}
                                     href={item.path}
                                     className={`flex items-center space-x-4 p-3 hover:bg-opacity-20 hover:bg-gray-700 rounded-md mx-2 ${
-                                        pathname === item.path ? (theme === 'dark' ? "bg-gray-700" : "bg-blue-700") : ""
-                                    } ${isExpanded ? (theme === 'dark' ? "bg-blue-900/30 hover:bg-blue-800/40" : "bg-blue-950/30 hover:bg-blue-900/40") : ""}`}
+                                        pathname === item.path ? (theme === 'dark' ? "bg-blue-violet/70" : "bg-blue-medium/70") : ""
+                                    } ${isExpanded ? (theme === 'dark' ? "bg-blue-dark/60 hover:bg-blue-violet/50" : "bg-blue-primary/40 hover:bg-blue-medium/40") : ""}`}
                                 >
-                                    <span className="text-xl text-blue-300">{getIcon(item.icon)}</span>
-                                    {isExpanded && <span className="text-sm font-medium text-blue-300">{item.name}</span>}
+                                    <span className="text-xl text-blue-sky">{getIcon(item.icon)}</span>
+                                    {isExpanded && <span className="text-sm font-medium text-blue-sky">{item.name}</span>}
                                 </Link>
                             ))}
                         </div>
@@ -178,7 +178,7 @@ export default function Sidebar() {
                 <Button
                     variant="ghost"
                     size="sm"
-                    className="flex items-center space-x-4 p-3 hover:bg-opacity-20 hover:bg-gray-700 rounded-md mx-2 w-full justify-start"
+                    className="flex items-center space-x-4 p-3 hover:bg-opacity-20 hover:bg-gray-700 rounded-md mx-2 w-full justify-start text-gray-light"
                     onClick={handleLogout}
                 >
                     <span className="text-xl"><TbLogout /></span>
