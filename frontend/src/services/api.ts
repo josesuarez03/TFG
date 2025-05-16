@@ -125,12 +125,40 @@ export const register = async (data: RegisterData): Promise<LoginResponse> => {
   }
 };
 
+// Función mejorada para obtener el perfil del usuario con mejor manejo de errores
 export const getUserProfile = async (): Promise<UserProfile> => {
   try {
-    const response = await API.get('profile/');
+    // Verificamos primero si tenemos un token
+    const token = sessionStorage.getItem('access_token');
+    if (!token) {
+      throw new Error('No hay token de acceso disponible');
+    }
+    
+    console.log('Obteniendo perfil de usuario con token:', token ? 'presente' : 'ausente');
+    
+    // Hacemos la solicitud explícitamente con el token en los headers
+    const response = await API.get('profile/', {
+      headers: {
+        'Authorization': `Bearer ${token}`
+      }
+    });
+    
+    console.log('Perfil de usuario obtenido:', response.data);
     return response.data;
   } catch (error) {
     console.error('Error al obtener el perfil del usuario:', error);
+    
+    // Manejo específico según el tipo de error
+    if (axios.isAxiosError(error) && error.response) {
+      if (error.response.status === 401) {
+        console.error('Error de autenticación al obtener perfil: Token inválido o expirado');
+      } else if (error.response.status === 404) {
+        console.error('Perfil no encontrado en el servidor');
+      } else {
+        console.error(`Error del servidor: ${error.response.status}`);
+      }
+    }
+    
     throw error;
   }
 };
@@ -141,6 +169,19 @@ export const updateUserProfile = async (data: ProfileUpdateData): Promise<UserPr
     return response.data;
   } catch (error) {
     console.error('Error al actualizar el perfil del usuario:', error);
+    throw error;
+  }
+};
+
+// Función para completar el perfil del usuario
+export const completeProfile = async (data: unknown): Promise<UserProfile> => {
+  try {
+    console.log('Enviando datos para completar perfil:', data);
+    const response = await API.post('complete/', data);
+    console.log('Respuesta al completar perfil:', response.data);
+    return response.data;
+  } catch (error) {
+    console.error('Error al completar el perfil:', error);
     throw error;
   }
 };

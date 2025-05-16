@@ -24,7 +24,7 @@ export function useAuth() {
         setUser(null);
         setIsAuthenticated(false);
         setLoading(false);
-        return;
+        return null;
       }
       
       // Usar la función getUserProfile importada desde api.ts
@@ -32,6 +32,7 @@ export function useAuth() {
       console.log('Perfil obtenido:', userProfile);
       setUser(userProfile);
       setIsAuthenticated(true);
+      return userProfile;
     } catch (err) {
       console.error("Error al obtener perfil de usuario:", err);
       setUser(null);
@@ -44,6 +45,8 @@ export function useAuth() {
         sessionStorage.removeItem('refresh_token');
         clearAuthCookies();
       }
+      
+      return null;
     } finally {
       setLoading(false);
     }
@@ -68,10 +71,18 @@ export function useAuth() {
       updateAuthCookies(access);
 
       // Obtener datos del perfil
-      await fetchUserProfile();
+      const userProfile = await fetchUserProfile();
+
+      // Verificar si el usuario necesita completar perfil
+      if (userProfile && !userProfile.is_profile_completed) {
+        console.log('Usuario necesita completar perfil, redirigiendo...');
+        router.push(ROUTES.PROTECTED.PROFILE_COMPLETE);
+      } else if (userProfile) {
+        console.log('Perfil completo, redirigiendo al dashboard...');
+        router.push(ROUTES.PROTECTED.DASHBOARD);
+      }
 
       setIsAuthenticated(true);
-      router.push(ROUTES.PROTECTED.DASHBOARD);
     } catch (err: unknown) {
       console.error("Error en login:", err);
       
@@ -109,10 +120,18 @@ export function useAuth() {
       updateAuthCookies(access);
 
       // Obtener perfil
-      await fetchUserProfile();
+      const userProfile = await fetchUserProfile();
+
+      // Verificar si necesita completar perfil
+      if (userProfile && !userProfile.is_profile_completed) {
+        console.log('Usuario Google necesita completar perfil, redirigiendo...');
+        router.push(ROUTES.PROTECTED.PROFILE_COMPLETE);
+      } else if (userProfile) {
+        console.log('Perfil Google completo, redirigiendo al dashboard...');
+        router.push(ROUTES.PROTECTED.DASHBOARD);
+      }
 
       setIsAuthenticated(true);
-      router.push(ROUTES.PROTECTED.DASHBOARD);
     } catch (err: unknown) {
       console.error("Error en Google login:", err);
       
@@ -156,7 +175,18 @@ export function useAuth() {
         console.log('Token en sessionStorage:', token ? 'presente' : 'ausente');
         
         if (token) {
-          await fetchUserProfile();
+          const userProfile = await fetchUserProfile();
+          
+          // Si el usuario está autenticado pero necesita completar perfil,
+          // verificamos en qué página estamos para redirigir si es necesario
+          if (userProfile && !userProfile.is_profile_completed) {
+            // Verificar si ya estamos en la página de completar perfil para evitar redirecciones circulares
+            const currentPath = window.location.pathname;
+            if (currentPath !== ROUTES.PROTECTED.PROFILE_COMPLETE) {
+              console.log('Perfil incompleto, redirigiendo desde checkAuth...');
+              router.push(ROUTES.PROTECTED.PROFILE_COMPLETE);
+            }
+          }
         } else {
           setLoading(false);
           setIsAuthenticated(false);
@@ -169,7 +199,7 @@ export function useAuth() {
     };
     
     checkAuth();
-  }, [fetchUserProfile]);
+  }, [fetchUserProfile, router]);
 
   return {
     user,
