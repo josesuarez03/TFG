@@ -26,13 +26,26 @@ export function middleware(request: NextRequest) {
   const profileCompletePath = ROUTES.PROTECTED.PROFILE_COMPLETE;
   const loginPath = ROUTES.PUBLIC.LOGIN;
 
-  // Special handling for root and login paths - allow direct access without checks
-  if (pathname === '/' || pathname === ROUTES.PUBLIC.LOGIN) {
-    return NextResponse.next();
+  // Si estamos en la ruta raíz y el usuario está autenticado, redirigir al dashboard
+  if (pathname === ROUTES.PUBLIC.ROOT_LOGIN || pathname === loginPath && isAuthenticated) {
+    return NextResponse.redirect(new URL(dashboardPath, request.url));
+  }
+  
+  // Si estamos en la ruta raíz y NO está autenticado, redirigir al login
+  if (pathname === ROUTES.PUBLIC.ROOT_LOGIN || pathname === loginPath && !isAuthenticated) {
+    return NextResponse.redirect(new URL(loginPath, request.url));
   }
   
   // Allow direct access to specific public pages without authentication
   if (pathMatches(pathname, ROUTES.PUBLIC)) {
+    // Si el usuario ya está autenticado y trata de acceder a páginas públicas, redirigirlo al dashboard
+    if (isAuthenticated) {
+      // Si el perfil no está completo, redirigir a la página de completar perfil
+      if (!isProfileCompleted) {
+        return NextResponse.redirect(new URL(profileCompletePath, request.url));
+      }
+      return NextResponse.redirect(new URL(dashboardPath, request.url));
+    }
     return NextResponse.next();
   }
   
@@ -41,16 +54,6 @@ export function middleware(request: NextRequest) {
     const url = new URL(loginPath, request.url);
     url.searchParams.set('from', pathname);
     return NextResponse.redirect(url);
-  }
-  
-  // Handle authenticated access to public routes (except root and login)
-  if (isAuthenticated && pathMatches(pathname, ROUTES.PUBLIC) && 
-      pathname !== '/' && pathname !== ROUTES.PUBLIC.LOGIN) {
-    // If profile not completed, don't redirect to dashboard but to profile completion
-    if (!isProfileCompleted) {
-      return NextResponse.redirect(new URL(profileCompletePath, request.url));
-    }
-    return NextResponse.redirect(new URL(dashboardPath, request.url));
   }
   
   // Handle doctor-specific routes
