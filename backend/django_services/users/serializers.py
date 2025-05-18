@@ -175,7 +175,7 @@ class GoogleOAuthUserInfoSerializer(serializers.Serializer):
     token = serializers.CharField(required=True)
 
 class RequiredOAuthUserSerializer(serializers.Serializer):
-    tipo = serializers.ChoiceField(choices=User.TIPO_USER, required=True)
+    tipo = serializers.ChoiceField(choices=User.TIPO_USER, required=False)
     fecha_nacimiento = serializers.DateField(required=True)
     telefono = serializers.CharField(required=True)
     direccion = serializers.CharField(required=True)
@@ -189,19 +189,28 @@ class RequiredOAuthUserSerializer(serializers.Serializer):
     especialidad = serializers.CharField(required=False)
     numero_licencia = serializers.CharField(required=False)
     
+    # Campo para actualizar el estado del perfil
+    is_profile_completed = serializers.BooleanField(required=False)
+    
     def validate(self, attrs):
+ 
+        request = self.context.get('request')
+        if request and request.method in ['PUT', 'PATCH', 'POST'] and 'tipo' not in attrs:
+
+            if request.user and hasattr(request.user, 'tipo') and request.user.tipo:
+                return attrs
+        
         tipo = attrs.get('tipo')
         
-        # Validar campos según el tipo de usuario
+        # Validar campos según el tipo de usuario cuando se proporciona un tipo
         if tipo == 'patient':
-            # Pacientes requieren al menos ocupación y alergias inicialmente
-            if not attrs.get('allergies'):
-                raise serializers.ValidationError({"allergies": "Este campo es requerido para pacientes"})
-            if not attrs.get('ocupacion'):
-                raise serializers.ValidationError({"ocupacion": "Este campo es requerido para pacientes"})
+            if request and request.method == 'POST':  # Solo validar en creación
+                if not attrs.get('allergies') and not any(field in self.initial_data for field in ['allergies', 'ocupacion']):
+                    raise serializers.ValidationError({"allergies": "Este campo es requerido para pacientes"})
+                if not attrs.get('ocupacion') and not any(field in self.initial_data for field in ['allergies', 'ocupacion']):
+                    raise serializers.ValidationError({"ocupacion": "Este campo es requerido para pacientes"})
         
         elif tipo == 'doctor':
-            # Médicos requieren especialidad y número de licencia
             if not attrs.get('especialidad'):
                 raise serializers.ValidationError({"especialidad": "Este campo es requerido para médicos"})
             if not attrs.get('numero_licencia'):

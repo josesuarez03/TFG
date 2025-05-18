@@ -202,15 +202,27 @@ class CompleteProfileView(generics.GenericAPIView):
     def patch(self, request, *args, **kwargs):
         return self.update(request, *args, **kwargs)
     
+    def get_serializer_context(self):
+
+        return {
+            'request': self.request,
+            'format': self.format_kwarg,
+            'view': self
+        }
+    
     def update(self, request, *args, **kwargs):
         user = self.get_object()
         serializer = self.get_serializer(user, data=request.data, partial=True)
         
         if serializer.is_valid():
             # Actualizar campos básicos del usuario
-            for field in ['tipo', 'fecha_nacimiento', 'telefono', 'direccion', 'genero']:
+            for field in ['fecha_nacimiento', 'telefono', 'direccion', 'genero']:
                 if field in serializer.validated_data:
                     setattr(user, field, serializer.validated_data[field])
+            
+            # Solo actualizar tipo si se proporciona explícitamente
+            if 'tipo' in serializer.validated_data:
+                user.tipo = serializer.validated_data['tipo']
             
             user.save()
             
@@ -246,7 +258,6 @@ class CompleteProfileView(generics.GenericAPIView):
             })
         
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
 class UserProfileView(generics.RetrieveUpdateDestroyAPIView):
     """Vista para ver, actualizar y eliminar el perfil del usuario"""
     serializer_class = UserProfileSerializer
