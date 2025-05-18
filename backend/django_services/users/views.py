@@ -888,21 +888,36 @@ class AccountDeleteView(APIView):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
     
 class LogoutView(APIView):
-
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
         try:
             refresh_token = request.data.get("refresh")
+            
             if not refresh_token:
-                return Response(
-                    {"error": "Se requiere el token de refresh."},
-                    status=status.HTTP_400_BAD_REQUEST
-                )
 
+                try:
+                    # Get all outstanding tokens for this user
+                    tokens = OutstandingToken.objects.filter(user_id=request.user.id)
+                    # Blacklist all tokens
+                    for token in tokens:
+                        BlacklistedToken.objects.get_or_create(token=token)
+                    
+                    return Response(
+                        {"message": "Todas las sesiones han sido cerradas correctamente."},
+                        status=status.HTTP_205_RESET_CONTENT
+                    )
+                except Exception as e:
+                    return Response(
+                        {"error": "No se proporcionó token de refresh y no se pudieron invalidar todas las sesiones.", 
+                         "details": str(e)},
+                        status=status.HTTP_400_BAD_REQUEST
+                    )
+            
+            # If refresh token is provided, blacklist it
             token = RefreshToken(refresh_token)
             token.blacklist()
-
+            
             return Response(
                 {"message": "Sesión cerrada correctamente."},
                 status=status.HTTP_205_RESET_CONTENT
@@ -910,5 +925,10 @@ class LogoutView(APIView):
         except TokenError as e:
             return Response(
                 {"error": "Token inválido o ya revocado.", "details": str(e)},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        except Exception as e:
+            return Response(
+                {"error": "Error al cerrar sesión.", "details": str(e)},
                 status=status.HTTP_400_BAD_REQUEST
             )
