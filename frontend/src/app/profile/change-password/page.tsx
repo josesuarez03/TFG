@@ -8,14 +8,14 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import API from '@/services/api';
+import {changePassword as apiChangePassword} from '@/services/api';
 import { useRouter } from 'next/navigation';
 import { useApiError } from '@/hooks/useApiError';
 import { TbLock, TbLockOpen, TbDeviceFloppy, TbArrowLeft } from "react-icons/tb";
 import { ROUTES } from '@/routes/routePaths';
 
 const changePasswordSchema = z.object({
-  currentPassword: z.string().min(1, { message: 'La contraseña actual es obligatoria' }),
+  oldPassword: z.string().min(1, { message: 'La contraseña actual es obligatoria' }),
   newPassword: z.string()
     .min(8, { message: 'La contraseña debe tener al menos 8 caracteres' })
     .regex(/[A-Z]/, { message: 'Debe contener al menos una letra mayúscula' })
@@ -46,11 +46,12 @@ export default function ChangePassword() {
     setSuccessMessage(null);
 
     try {
-      await API.post('change-password/', {
-        current_password: data.currentPassword,
-        new_password: data.newPassword,
+      await apiChangePassword({
+      old_password: data.oldPassword,
+      new_password: data.newPassword,
+      confirm_password: data.confirmPassword
       });
-      
+    
       setSuccessMessage('Contraseña actualizada con éxito');
       reset();
       
@@ -93,11 +94,11 @@ export default function ChangePassword() {
           <Input 
             id="currentPassword"
             type="password" 
-            {...register('currentPassword')} 
-            className={errors.currentPassword ? 'border-red-500' : ''}
+            {...register('oldPassword')} 
+            className={errors.oldPassword ? 'border-red-500' : ''}
           />
-          {errors.currentPassword && (
-            <p className="text-red-500 text-sm mt-1">{errors.currentPassword.message}</p>
+          {errors.oldPassword && (
+            <p className="text-red-500 text-sm mt-1">{errors.oldPassword.message}</p>
           )}
         </div>
         

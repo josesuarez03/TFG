@@ -197,9 +197,9 @@ export const logout = async (): Promise<void> => {
   }
 };
 
-export const deleteUser = async (): Promise<void> => {
+export const deleteUser = async (password:string): Promise<void> => {
   try {
-    await API.delete('account/delete/');
+    await API.delete('account/delete/', {data: {password}});
     sessionStorage.removeItem('access_token');
     sessionStorage.removeItem('refresh_token');
   } catch (error) {
@@ -207,5 +207,17 @@ export const deleteUser = async (): Promise<void> => {
     throw error;
   }
 };
+
+export const changePassword = async (data: { old_password: string; new_password: string; confirm_password: string; }): Promise<void> => {
+  try {
+    const response = await API.post('password/change/', data);
+    if (response.status !== 200) {
+      throw new Error('Error al cambiar la contraseña');
+    }
+  } catch (error) {
+    console.error('Error al cambiar la contraseña:', error);
+    throw error;
+  }
+}
 
 export default API;
