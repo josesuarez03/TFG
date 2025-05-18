@@ -190,7 +190,7 @@ export default function UserProfile() {
                     </p>
                     <div className="flex flex-col sm:flex-row items-center space-y-4 sm:space-y-0 sm:space-x-4">
                         <Button 
-                            onClick={() => router.push(ROUTES.PROTECTED.PROFILE_EDIT)} 
+                            onClick={() => router.push(ROUTES.PROTECTED.PROFILE_CHANGE_PASSWORD)} 
                             className="w-full sm:w-auto"
                         >
                             Cambiar Contraseña
