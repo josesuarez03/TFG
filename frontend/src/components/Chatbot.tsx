@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useState, useRef } from 'react';
-import { useWebSocket } from '@/hooks/useWs';
+import { useSocketIO } from '@/hooks/useWs';
 import { useAuth } from '@/hooks/useAuth';
 import { Card, CardHeader, CardTitle, CardContent, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -10,47 +10,90 @@ import { TbSend } from 'react-icons/tb';
 import type { Message } from '@/types/messages';
 
 export default function Chatbot() {
-    const { user } = useAuth();
+    const { user, isAuthenticated } = useAuth();
     const [input, setInput] = useState('');
     const [messages, setMessages] = useState<Message[]>([]);
     const [isLoading, setIsLoading] = useState(false);
     const messagesEndRef = useRef<HTMLDivElement>(null);
     
-    const wsUrl = process.env.NEXT_PUBLIC_WS_URL || '';
-    const { messages: wsMessages, sendMessage } = useWebSocket(wsUrl);
+    // Usar Socket.IO URL
+    const socketUrl = process.env.NEXT_PUBLIC_SOCKETIO_URL || 'http://localhost:5000';
+    const { 
+        messages: socketMessages, 
+        sendMessage, 
+        isConnected, 
+        isConnecting,
+        connectionError,
+        reauthenticate,
+    } = useSocketIO(socketUrl, isAuthenticated);
+    
+    // Re-autenticar cuando el usuario haga login y socket esté conectado
+    useEffect(() => {
+        if (isAuthenticated && isConnected) {
+            reauthenticate();
+        }
+    }, [isAuthenticated, isConnected, reauthenticate]);
     
     // Mensaje inicial de Hipo
     useEffect(() => {
         setMessages([
             {
                 id: '0',
-                content: 'Hola, soy Hipo tu asistente medico. ¿Como te sientes hoy?',
+                content: 'Hola, soy Hipo tu asistente médico. ¿Cómo te sientes hoy?',
                 sender: 'bot',
                 timestamp: new Date(),
             }
         ]);
     }, []);
     
-    // Procesar mensajes entrantes del websocket
+    // Procesar mensajes entrantes del Socket.IO
     useEffect(() => {
-        if (wsMessages.length > 0) {
+        if (socketMessages.length > 0) {
+            const lastMessage = socketMessages[socketMessages.length - 1];
+            console.log('📨 Procesando mensaje:', lastMessage);
+            
             try {
-                const lastMessage = wsMessages[wsMessages.length - 1];
-                const parsedMessage = JSON.parse(lastMessage);
+                let messageContent: string;
                 
-                setMessages(prev => [...prev, {
-                    id: Date.now().toString(),
-                    content: parsedMessage.content,
-                    sender: 'bot',
-                    timestamp: new Date(),
-                }]);
+                // Intentar parsear como JSON si es necesario
+                try {
+                    const parsedMessage = JSON.parse(lastMessage);
+                    messageContent = parsedMessage.content || 
+                                   parsedMessage.message || 
+                                   parsedMessage.response || 
+                                   parsedMessage.text || 
+                                   lastMessage;
+                } catch {
+                    // Si no es JSON válido, usar el mensaje tal como está
+                    messageContent = lastMessage;
+                }
                 
-                setIsLoading(false);
+                // Verificar que el contenido no esté vacío
+                if (messageContent && messageContent.trim()) {
+                    const newMessage: Message = {
+                        id: Date.now().toString(),
+                        content: typeof messageContent === 'string' ? messageContent : JSON.stringify(messageContent),
+                        sender: 'bot',
+                        timestamp: new Date(),
+                    };
+                    
+                    setMessages(prev => {
+                        // Evitar duplicados checking del último mensaje
+                        const lastMsg = prev[prev.length - 1];
+                        if (lastMsg && lastMsg.content === newMessage.content && lastMsg.sender === 'bot') {
+                            return prev;
+                        }
+                        return [...prev, newMessage];
+                    });
+                    
+                    setIsLoading(false);
+                }
             } catch (error) {
-                console.error('Error parsing websocket message:', error);
+                console.error('❌ Error procesando mensaje de Socket.IO:', error);
+                setIsLoading(false);
             }
         }
-    }, [wsMessages]);
+    }, [socketMessages]);
     
     // Auto-scroll al último mensaje
     useEffect(() => {
@@ -60,7 +103,10 @@ export default function Chatbot() {
     const handleSendMessage = (e: React.FormEvent) => {
         e.preventDefault();
         
-        if (!input.trim()) return;
+        if (!input.trim() || !isConnected) {
+            console.warn('⚠️ No se puede enviar: entrada vacía o no conectado');
+            return;
+        }
         
         // Agregar el mensaje del usuario al chat
         const userMessage: Message = {
@@ -73,21 +119,66 @@ export default function Chatbot() {
         setMessages(prev => [...prev, userMessage]);
         setIsLoading(true);
         
-        // Enviar mensaje al servidor via websocket
-        const messagePayload = JSON.stringify({
-            userId: user?.id || 'guest',
+        // Preparar payload para el servidor
+        const messagePayload = {
             message: input,
-            timestamp: new Date().toISOString()
-        });
+            user_id: user?.id || 'guest',
+            timestamp: new Date().toISOString(),
+            context: {} // Datos adicionales si es necesario
+        };
         
-        sendMessage(messagePayload);
+        console.log('📤 Enviando mensaje:', messagePayload);
+        
+        // Enviar mensaje al servidor via Socket.IO
+        const success = sendMessage(JSON.stringify(messagePayload));
+        
+        if (!success) {
+            console.error('❌ Fallo al enviar mensaje');
+            setIsLoading(false);
+            // Opcionalmente remover el mensaje del usuario si falla el envío
+            setMessages(prev => prev.slice(0, -1));
+        }
+        
         setInput('');
+    };
+    
+    // Función para obtener el estado de conexión
+    const getConnectionStatus = () => {
+        if (isConnecting) return 'Conectando...';
+        if (isConnected) return 'Conectado';
+        if (connectionError) return `Error: ${connectionError}`;
+        return 'Desconectado';
     };
     
     return (
         <Card className="w-full h-[85vh] max-w-md mx-auto flex flex-col">
             <CardHeader className="py-3 px-4 border-b">
-                <CardTitle className="text-xl font-bold text-center">Hipo</CardTitle>
+                <div className="flex items-center justify-between">
+                    <CardTitle className="text-xl font-bold">
+                        Hipo ({getConnectionStatus()})
+                    </CardTitle>
+                </div>
+                
+                {/* Indicador visual de estado */}
+                <div className="flex items-center gap-2 mt-2">
+                    <div 
+                        className={`w-2 h-2 rounded-full ${
+                            isConnected ? 'bg-green-500' : 
+                            isConnecting ? 'bg-yellow-500' : 
+                            'bg-red-500'
+                        }`}
+                    />
+                    <span className="text-sm text-gray-500">
+                        {getConnectionStatus()}
+                    </span>
+                </div>
+                
+                {/* Mostrar error si existe */}
+                {connectionError && (
+                    <div className="text-sm text-red-500 mt-1">
+                        {connectionError}
+                    </div>
+                )}
             </CardHeader>
             
             <CardContent className="flex-1 overflow-y-auto p-4 space-y-4">
@@ -103,7 +194,12 @@ export default function Chatbot() {
                                     : 'bg-muted'
                             }`}
                         >
-                            {message.content}
+                            <div className="whitespace-pre-wrap">
+                                {message.content}
+                            </div>
+                            <div className="text-xs opacity-70 mt-1">
+                                {message.timestamp.toLocaleTimeString()}
+                            </div>
                         </div>
                     </div>
                 ))}
@@ -128,14 +224,19 @@ export default function Chatbot() {
                     <Input
                         value={input}
                         onChange={(e) => setInput(e.target.value)}
-                        placeholder="Escribe tu mensaje aquí..."
+                        placeholder={
+                            isConnected ? "Escribe tu mensaje aquí..." : 
+                            isConnecting ? "Conectando..." : 
+                            "No conectado"
+                        }
                         className="flex-1"
-                        disabled={isLoading}
+                        disabled={isLoading || !isConnected}
                     />
                     <Button 
                         type="submit" 
                         size="icon"
-                        disabled={isLoading || !input.trim()}
+                        disabled={isLoading || !input.trim() || !isConnected}
+                        title={!isConnected ? "No conectado al servidor" : "Enviar mensaje"}
                     >
                         <TbSend className="h-5 w-5" />
                     </Button>
