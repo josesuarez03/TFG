@@ -826,66 +826,74 @@ class ChangePasswordView(APIView):
     
     def post(self, request):
         serializer = self.serializer_class(data=request.data)
-        if serializer.is_valid():
-            user = request.user
+        
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
             
-            # Verificar la contraseña actual
-            if not user.check_password(serializer.validated_data['old_password']):
-                return Response(
-                    {"old_password": ["La contraseña actual es incorrecta."]},
-                    status=status.HTTP_400_BAD_REQUEST
-                )
-                
-            # Establecer la nueva contraseña
-            user.set_password(serializer.validated_data['new_password'])
-            user.save()
-            
+        user = request.user
+        
+        # Verificar la contraseña actual
+        if not user.check_password(serializer.validated_data['old_password']):
             return Response(
-                {"message": "Tu contraseña ha sido cambiada correctamente."},
-                status=status.HTTP_200_OK
+                {"old_password": ["La contraseña actual es incorrecta."]},
+                status=status.HTTP_400_BAD_REQUEST
             )
             
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        # Establecer la nueva contraseña
+        user.set_password(serializer.validated_data['new_password'])
+        user.save()
+        
+        # Generar nuevos tokens para mantener la sesión del usuario
+        refresh = RefreshToken.for_user(user)
+        
+        return Response({
+            "message": "Tu contraseña ha sido cambiada correctamente.",
+            "refresh": str(refresh),
+            "access": str(refresh.access_token)
+        }, status=status.HTTP_200_OK)
 
 class AccountDeleteView(APIView):
-    """Vista para eliminación segura de cuenta con contraseña"""
+    """Vista para eliminación segura de cuenta mediante solicitudes DELETE"""
     permission_classes = [IsAuthenticated]
-    serializer_class = AccountDeleteSerializer
     
-    def post(self, request):
-        serializer = self.serializer_class(data=request.data)
-        if serializer.is_valid():
-            password = serializer.validated_data.get('password')
-            
-            # Para cuentas OAuth no se requiere contraseña
-            if request.user.oauth_provider and request.user.oauth_uid:
-                request.user.delete()
-                return Response(
-                    {"message": "Tu cuenta ha sido eliminada correctamente."},
-                    status=status.HTTP_204_NO_CONTENT
-                )
-                
-            # Para cuentas con contraseña, verificar la contraseña
-            if not password:
-                return Response(
-                    {"error": "Debes proporcionar tu contraseña para eliminar la cuenta."},
-                    status=status.HTTP_400_BAD_REQUEST
-                )
-                
-            if not request.user.check_password(password):
-                return Response(
-                    {"error": "La contraseña proporcionada es incorrecta."},
-                    status=status.HTTP_400_BAD_REQUEST
-                )
-                
-            # Eliminar la cuenta
+    def delete(self, request):
+
+        # Para cuentas OAuth, no requiere contraseña
+        if request.user.oauth_provider and request.user.oauth_uid:
             request.user.delete()
             return Response(
                 {"message": "Tu cuenta ha sido eliminada correctamente."},
                 status=status.HTTP_204_NO_CONTENT
             )
         
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        # Buscar la contraseña en el cuerpo de la solicitud o en los parámetros
+        password = None
+        if hasattr(request, 'data') and request.data:
+            password = request.data.get('password')
+        
+        # Si no hay contraseña, verificar en los parámetros (para compatibilidad con diferentes clientes)
+        if not password and request.query_params:
+            password = request.query_params.get('password')
+        
+        # Para cuentas con contraseña, verificar la contraseña
+        if not password:
+            return Response(
+                {"error": "Debes proporcionar tu contraseña para eliminar la cuenta."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+            
+        if not request.user.check_password(password):
+            return Response(
+                {"error": "La contraseña proporcionada es incorrecta."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+            
+        # Eliminar la cuenta
+        request.user.delete()
+        return Response(
+            {"message": "Tu cuenta ha sido eliminada correctamente."},
+            status=status.HTTP_204_NO_CONTENT
+        )
     
 class LogoutView(APIView):
     permission_classes = [IsAuthenticated]
