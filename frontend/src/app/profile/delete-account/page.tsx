@@ -55,7 +55,7 @@ export default function DeleteAccount() {
     clearError();
     
     try {
-      await apiDeleteUser()
+      await apiDeleteUser(data.password);
       
       // Cerrar diálogo y hacer logout
       setIsDialogOpen(false);
