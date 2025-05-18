@@ -1,7 +1,7 @@
 "use client"
 
 import React, { useState, useRef, useEffect } from 'react';
-import { useRouter } from 'next/router';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -11,13 +11,14 @@ import { ROUTES } from '@/routes/routePaths';
 
 export default function VerifyCode() {
   const router = useRouter();
-  const { email } = router.query;
+  const searchParams = useSearchParams();
+  const email = searchParams.get('email');
+
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [code, setCode] = useState(['', '', '', '', '', '']); // Ajustado a 6 dígitos según la API
+  const [code, setCode] = useState(['', '', '', '', '', '']);
   const [verificationMessage, setVerificationMessage] = useState('');
   const { error, handleApiError, clearError } = useApiError();
 
-  // Referencia para los inputs del código
   const inputRefs = [
     useRef<HTMLInputElement>(null),
     useRef<HTMLInputElement>(null),
@@ -27,59 +28,48 @@ export default function VerifyCode() {
     useRef<HTMLInputElement>(null),
   ];
 
-  // Enfocar el primer input al cargar
   useEffect(() => {
     if (inputRefs[0].current) {
       inputRefs[0].current.focus();
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Manejar el cambio en cada dígito del código
   const handleCodeChange = (index: number, value: string) => {
-    // Permitir solo números
     if (value && !/^\d*$/.test(value)) return;
 
-    // Actualizar el valor en el estado
     const newCode = [...code];
     newCode[index] = value;
     setCode(newCode);
 
-    // Mover el foco al siguiente input si se ingresó un dígito
     if (value && index < inputRefs.length - 1 && inputRefs[index + 1].current) {
       inputRefs[index + 1].current?.focus();
     }
   };
 
-  // Manejar cuando se presiona backspace
   const handleKeyDown = (index: number, e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Backspace') {
       if (!code[index] && index > 0 && inputRefs[index - 1].current) {
-        // Si el campo actual está vacío y se presiona backspace, mover al campo anterior
         inputRefs[index - 1].current?.focus();
       }
     }
   };
 
-  // Manejar pegar código
   const handlePaste = (e: React.ClipboardEvent) => {
     e.preventDefault();
     const pastedData = e.clipboardData.getData('text');
-    
-    // Verificar si es un número y tiene la longitud correcta
+
     if (/^\d+$/.test(pastedData)) {
       const digits = pastedData.split('').slice(0, 6);
       const newCode = [...code];
-      
+
       digits.forEach((digit, index) => {
         if (index < newCode.length) {
           newCode[index] = digit;
         }
       });
-      
+
       setCode(newCode);
-      
-      // Enfocar el último input o el siguiente vacío
+
       const lastFilledIndex = Math.min(digits.length - 1, inputRefs.length - 1);
       if (inputRefs[lastFilledIndex].current) {
         inputRefs[lastFilledIndex].current?.focus();
@@ -87,10 +77,9 @@ export default function VerifyCode() {
     }
   };
 
-  // Verificar el código
   const verifyCode = async () => {
     const fullCode = code.join('');
-    
+
     if (fullCode.length !== 6) {
       setVerificationMessage('Por favor, ingresa el código completo de 6 dígitos.');
       return;
@@ -105,23 +94,15 @@ export default function VerifyCode() {
     clearError();
 
     try {
-      // Ajustamos la ruta de la API según urls.py y agregamos una nueva contraseña
-      const newPassword = "TemporaryPass123!"; // Esto realmente no se usará
-      
-      // Validar el código con el backend (solo verificación)
-      const response = await API.post('password/reset/verify/', {
-        email: typeof email === 'string' ? email : email[0],
+      const newPassword = "TemporaryPass123!"; // Temporal
+
+      await API.post('password/reset/verify/', {
+        email,
         code: fullCode,
         new_password: newPassword
       });
 
-      // Redirigir directamente a la página de login con un mensaje
-      router.push({
-        pathname: ROUTES.PUBLIC.LOGIN,
-        query: { 
-          message: 'Contraseña restablecida correctamente. Ahora puedes iniciar sesión.'
-        }
-      });
+      router.push(`${ROUTES.PUBLIC.LOGIN}?message=Contraseña%20restablecida%20correctamente.%20Ahora%20puedes%20iniciar%20sesión.`);
     } catch (err) {
       handleApiError(err);
       setVerificationMessage('Código inválido. Por favor, intenta nuevamente.');
@@ -130,19 +111,14 @@ export default function VerifyCode() {
     }
   };
 
-  // Función para manejar la solicitud de un nuevo código
   const handleResendCode = async () => {
     if (!email) return;
-    
+
     setIsSubmitting(true);
     clearError();
 
     try {
-      // Actualizamos la ruta de la API para que coincida con urls.py
-      await API.post('password/reset/request/', {
-        email: typeof email === 'string' ? email : email[0]
-      });
-
+      await API.post('password/reset/request/', { email });
       setVerificationMessage('Se ha enviado un nuevo código a tu correo electrónico.');
     } catch (err) {
       handleApiError(err);
