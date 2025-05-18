@@ -13,7 +13,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import API from '@/services/api';
+import {updateUserProfile as apiUpdateProfile} from '@/services/api';
 import { 
   TbArrowLeft, 
   TbDeviceFloppy, 
@@ -82,6 +82,8 @@ export default function EditProfile(){
 
     useEffect(() => {
             if (user) {
+                setValue('first_name', user.first_name || '');
+                setValue('last_name', user.last_name || '');
                 setValue('fecha_nacimiento', user.fecha_nacimiento || '');
                 setValue('telefono', user.telefono || '');
                 setValue('direccion', user.direccion || '');
@@ -104,13 +106,14 @@ export default function EditProfile(){
         }
     }, [user, authLoading, router]);
 
-    const onSubmit = async (data: ProfileFormData) => {
+     const onSubmit = async (data: ProfileFormData) => {
         setLoading(true);
         setError(null);
         setSuccess(false);
 
         try {
-            await API.put('/profile/update/', data);
+            // Utilizamos la función importada en lugar de API.put
+            await apiUpdateProfile(data);
             setSuccess(true);
             // Mostrar mensaje de éxito por un momento antes de redirigir
             setTimeout(() => {
@@ -122,7 +125,7 @@ export default function EditProfile(){
         } finally {
             setLoading(false);
         }
-    };
+    }
 
     const handleCancel = () => {
         router.push(ROUTES.PROTECTED.PROFILE);

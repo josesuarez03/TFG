@@ -18,7 +18,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import API from '@/services/api';
+import {deleteUser as apiDeleteUser} from '@/services/api';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/hooks/useAuth';
 import { useApiError } from '@/hooks/useApiError';
@@ -55,9 +55,7 @@ export default function DeleteAccount() {
     clearError();
     
     try {
-      await API.post('delete-account/', {
-        password: data.password
-      });
+      await apiDeleteUser()
       
       // Cerrar diálogo y hacer logout
       setIsDialogOpen(false);
