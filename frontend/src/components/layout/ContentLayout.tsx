@@ -1,6 +1,6 @@
 'use client';
 
-import React from "react";
+import React, { useEffect, useState } from "react";
 import Header from "@/components/Header";
 import Sidebar from "@/components/Sidebar";
 import Loading from "@/components/loading";
@@ -12,69 +12,100 @@ export default function ContentLayout({ children }: { children: React.ReactNode 
     const { isAuthenticated, loading } = useAuth();
     const pathname = usePathname();
     const router = useRouter();
+    const [isLoading, setIsLoading] = useState(true);
 
-    // Check if current path is a public route
-    const isPublicRoute = Object.values(ROUTES.PUBLIC).some(route => pathname === route || pathname?.startsWith(route));
-    
-    // Also consider root path as public
-    const isPublicOrRoot = isPublicRoute || pathname === '/';
+    // Verificar si la ruta actual es pública de manera más explícita
+    const isPublicRoute = Object.values(ROUTES.PUBLIC).some(route => 
+        pathname === route || 
+        (pathname && pathname.startsWith(`${route}/`)) ||
+        (pathname && pathname.startsWith(route) && pathname.charAt(route.length) === '?')
+    );
 
-    // Determine if we should show the full layout (sidebar + header)
-    const shouldShowFullLayout = isAuthenticated && !isPublicOrRoot;
+    // Determinar si es una ruta protegida explícitamente
+    const isProtectedRoute = Object.values(ROUTES.PROTECTED).some(route => 
+        pathname === route || 
+        (pathname && pathname.startsWith(`${route}/`)) ||
+        (pathname && pathname.startsWith(route) && pathname.charAt(route.length) === '?')
+    );
 
-    React.useEffect(() => {
-        // Only redirect if not loading
-        if (!loading) {
-          // Handle root path - silently redirect to login if not authenticated
-          if (pathname === '/' && !isAuthenticated) {
-            router.push(ROUTES.PUBLIC.LOGIN);
-            return;
-          }
-          
-          // Only redirect from protected routes to login if not authenticated
-          // Don't redirect away from public routes
-          if (!isAuthenticated && !isPublicRoute && pathname !== '/') {
-            router.push(ROUTES.PUBLIC.LOGIN + '?from=' + encodeURIComponent(pathname || ''));
-          }
+    // Determinar si es una ruta de doctor explícitamente
+    const isDoctorRoute = Object.values(ROUTES.DOCTOR).some(route => 
+        pathname === route || 
+        (pathname && pathname.startsWith(`${route}/`)) ||
+        (pathname && pathname.startsWith(route) && pathname.charAt(route.length) === '?')
+    );
+
+    // Solo mostrar el layout completo si está autenticado Y está en una ruta protegida o de doctor
+    const shouldShowFullLayout = isAuthenticated && (isProtectedRoute || isDoctorRoute);
+
+    // Debug output
+    useEffect(() => {
+        if (process.env.NODE_ENV === 'development') {
+            console.log('Layout state:', {
+                isAuthenticated,
+                pathname,
+                isPublicRoute,
+                isProtectedRoute,
+                isDoctorRoute,
+                shouldShowFullLayout
+            });
         }
-    }, [isAuthenticated, isPublicRoute, loading, pathname, router]);
+    }, [isAuthenticated, pathname, isPublicRoute, isProtectedRoute, isDoctorRoute, shouldShowFullLayout]);
+
+    // Handle navigation and auth state
+    useEffect(() => {
+        // Solo proceder si no está cargando
+        if (!loading) {
+            setIsLoading(false);
+            
+            // Manejar redirección de la ruta raíz
+            if (pathname === '/') {
+                if (isAuthenticated) {
+                    console.log('Redirigiendo de / a dashboard');
+                    router.push(ROUTES.PROTECTED.DASHBOARD);
+                } else {
+                    console.log('Redirigiendo de / a login');
+                    router.push(ROUTES.PUBLIC.LOGIN);
+                }
+                return;
+            }
+          
+            // Manejar acceso a rutas protegidas cuando no está autenticado
+            if (!isAuthenticated && (isProtectedRoute || isDoctorRoute)) {
+                console.log('No autenticado accediendo a ruta protegida, redirigiendo a login');
+                router.push(`${ROUTES.PUBLIC.LOGIN}?from=${encodeURIComponent(pathname || '')}`);
+                return;
+            }
+
+        }
+    }, [isAuthenticated, isProtectedRoute, isDoctorRoute, loading, pathname, router]);
     
-    // Show loading component while authentication state is being determined
-    if (loading) {
+    // Mostrar componente de carga mientras se determina el estado de autenticación
+    if (loading || isLoading) {
         return <Loading />;
     }
 
-    // Full layout for authenticated users on protected routes
+    // Layout completo para usuarios autenticados en rutas no públicas
     if (shouldShowFullLayout) {
         return (
-          <div className="flex h-screen bg-gray-50 dark:bg-gray-900">
-            <Sidebar />
-            <div className="flex flex-col flex-1 overflow-hidden">
-              <Header />
-              <main className="flex-1 p-6 overflow-y-auto">
-                {children}
-              </main>
+            <div className="flex h-screen bg-gray-50 dark:bg-gray-900">
+                <Sidebar />
+                <div className="flex flex-col flex-1 overflow-hidden">
+                    <Header />
+                    <main className="flex-1 p-6 overflow-y-auto">
+                        {children}
+                    </main>
+                </div>
             </div>
-          </div>
         );
     }
       
-    // Simple layout for public routes
+    // Layout simple para rutas públicas
     return (
-      <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
-        {isPublicOrRoot ? (
-          // Layout for public pages (login, register, etc.)
-          <div className="flex justify-center items-center min-h-screen">
-            {children}
-          </div>
-        ) : (
-          // Layout for unauthorized access (should be handled by middleware)
-          <div className="flex justify-center items-center min-h-screen">
-            <div className="text-center p-8">
-              <p className="text-gray-600 dark:text-gray-300">Acceso denegado. Por favor inicia sesión.</p>
+        <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+            <div className="flex justify-center items-center min-h-screen">
+                {children}
             </div>
-          </div>
-        )}
-      </div>
+        </div>
     );
 }
