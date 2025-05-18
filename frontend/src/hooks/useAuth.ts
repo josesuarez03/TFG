@@ -2,10 +2,14 @@ import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import axios from "axios";
 import { login as apiLogin, loginWithGoogle as apiLoginWithGoogle, getUserProfile, logout as apiLogout } from "@/services/api";
-//import { LoginResponse } from "@/types/auth";
 import { UserProfile } from "@/types/user";
 import { ROUTES } from "@/routes/routePaths";
-import { clearAuthCookies, updateAuthCookies } from "@/utils/authSync";
+import { 
+  clearAuthCookies, 
+  updateAuthCookies, 
+  syncAuthState, 
+  subscribeToAuthChanges 
+} from "@/utils/authSync";
 
 export function useAuth() {
   const router = useRouter();
@@ -13,6 +17,19 @@ export function useAuth() {
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
+
+  // Check for access token and update state
+  const checkStorageAuth = useCallback(() => {
+    const token = sessionStorage.getItem('access_token');
+    const authenticated = !!token;
+    
+    if (isAuthenticated !== authenticated) {
+      console.log('Authentication state changed based on storage:', authenticated);
+      setIsAuthenticated(authenticated);
+    }
+    
+    return authenticated;
+  }, [isAuthenticated]);
 
   const fetchUserProfile = useCallback(async () => {
     try {
@@ -32,6 +49,10 @@ export function useAuth() {
       console.log('Perfil obtenido:', userProfile);
       setUser(userProfile);
       setIsAuthenticated(true);
+      
+      // Make sure cookies are in sync after profile fetch
+      syncAuthState();
+      
       return userProfile;
     } catch (err) {
       console.error("Error al obtener perfil de usuario:", err);
@@ -68,7 +89,11 @@ export function useAuth() {
       // Guardar tokens en sessionStorage
       sessionStorage.setItem("access_token", access);
       sessionStorage.setItem("refresh_token", refresh);
+      
+      // Update cookies and dispatch auth change event
       updateAuthCookies(access);
+      
+      setIsAuthenticated(true);
 
       // Obtener datos del perfil
       const userProfile = await fetchUserProfile();
@@ -81,8 +106,6 @@ export function useAuth() {
         console.log('Perfil completo, redirigiendo al dashboard...');
         router.push(ROUTES.PROTECTED.DASHBOARD);
       }
-
-      setIsAuthenticated(true);
     } catch (err: unknown) {
       console.error("Error en login:", err);
       
@@ -117,7 +140,11 @@ export function useAuth() {
       // Guardar tokens
       sessionStorage.setItem("access_token", access);
       sessionStorage.setItem("refresh_token", refresh);
+      
+      // Update cookies and dispatch auth change event
       updateAuthCookies(access);
+      
+      setIsAuthenticated(true);
 
       // Obtener perfil
       const userProfile = await fetchUserProfile();
@@ -130,8 +157,6 @@ export function useAuth() {
         console.log('Perfil Google completo, redirigiendo al dashboard...');
         router.push(ROUTES.PROTECTED.DASHBOARD);
       }
-
-      setIsAuthenticated(true);
     } catch (err: unknown) {
       console.error("Error en Google login:", err);
       
@@ -167,14 +192,35 @@ export function useAuth() {
       });
   }, [router]);
 
+  // Listen for auth changes from other components
+  useEffect(() => {
+    const unsubscribe = subscribeToAuthChanges((newAuthState) => {
+      console.log('Auth state changed from event:', newAuthState);
+      setIsAuthenticated(newAuthState);
+      
+      // If authentication state changed to false, clear user
+      if (!newAuthState) {
+        setUser(null);
+      } else if (newAuthState && !user) {
+        // If authenticated but no user data, fetch profile
+        fetchUserProfile();
+      }
+    });
+    
+    return unsubscribe;
+  }, [fetchUserProfile, user]);
+
   // Verificar autenticación al cargar el componente
   useEffect(() => {
     const checkAuth = async () => {
       try {
-        const token = sessionStorage.getItem("access_token");
-        console.log('Token en sessionStorage:', token ? 'presente' : 'ausente');
+        const isAuthFromStorage = checkStorageAuth();
+        console.log('Token en sessionStorage:', isAuthFromStorage ? 'presente' : 'ausente');
         
-        if (token) {
+        if (isAuthFromStorage) {
+          // Sync cookies with session storage state
+          syncAuthState();
+          
           const userProfile = await fetchUserProfile();
           
           // Si el usuario está autenticado pero necesita completar perfil,
@@ -189,7 +235,6 @@ export function useAuth() {
           }
         } else {
           setLoading(false);
-          setIsAuthenticated(false);
         }
       } catch (error) {
         console.error("Error verificando autenticación:", error);
@@ -199,7 +244,20 @@ export function useAuth() {
     };
     
     checkAuth();
-  }, [fetchUserProfile, router]);
+    
+    // Add event listener for storage changes in other tabs
+    const handleStorageChange = (event: StorageEvent) => {
+      if (event.key === 'access_token' || event.key === null) {
+        checkStorageAuth();
+        syncAuthState();
+      }
+    };
+    
+    window.addEventListener('storage', handleStorageChange);
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+    };
+  }, [checkStorageAuth, fetchUserProfile, router]);
 
   return {
     user,
