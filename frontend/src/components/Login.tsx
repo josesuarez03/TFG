@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/hooks/useAuth';
 import { GoogleOAuthProvider, GoogleLogin, CredentialResponse } from '@react-oauth/google';
 import { Card, CardHeader, CardTitle, CardContent, CardFooter } from "@/components/ui/card";
@@ -17,6 +17,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { TbLock, TbUser, TbBrandGoogle, TbLoader, TbAlertTriangle, TbLogin } from 'react-icons/tb';
 import { ROUTES } from '@/routes/routePaths';
+import { syncAuthState } from '@/utils/authSync';
 
 const loginSchema = z.object({
   username_or_email: z.string()
@@ -33,6 +34,9 @@ type LoginFormInputs = z.infer<typeof loginSchema>;
 
 export default function Login() {
     const router = useRouter();
+    const searchParams = useSearchParams();
+    const fromRoute = searchParams.get('from');
+    
     const { login, loginWithGoogle, error: authError, loading, isAuthenticated, user } = useAuth();
     const { register, handleSubmit, formState: { errors } } = useForm<LoginFormInputs>({
         resolver: zodResolver(loginSchema)
@@ -40,6 +44,11 @@ export default function Login() {
     const [googleError, setGoogleError] = useState<string | null>(null);
     const [googleLoginButtonRef, setGoogleLoginButtonRef] = useState<HTMLDivElement | null>(null);
     const [redirecting, setRedirecting] = useState(false);
+
+    // Force sync auth state when component mounts
+    useEffect(() => {
+        syncAuthState();
+    }, []);
 
     // Función de redirección basada en el estado del perfil
     const redirectBasedOnProfileStatus = React.useCallback(() => {
@@ -55,16 +64,24 @@ export default function Login() {
         if (!user.is_profile_completed) {
             console.log('Redirigiendo a completar perfil');
             router.push(ROUTES.PROTECTED.PROFILE_COMPLETE);
+        } else if (fromRoute && fromRoute !== ROUTES.PUBLIC.LOGIN) {
+            console.log('Redirigiendo a la ruta original:', fromRoute);
+            router.push(fromRoute);
         } else {
             console.log('Redirigiendo al dashboard');
             router.push(ROUTES.PROTECTED.DASHBOARD);
         }
-    }, [isAuthenticated, user, redirecting, router]);
+    }, [isAuthenticated, user, redirecting, router, fromRoute]);
 
     // Verificar autenticación y estado del perfil cuando cambian
     useEffect(() => {
         if (isAuthenticated && user) {
-            redirectBasedOnProfileStatus();
+            console.log('Usuario autenticado y perfil cargado, preparando redirección...');
+            // Add a small delay to ensure all state updates have propagated
+            const timeout = setTimeout(() => {
+                redirectBasedOnProfileStatus();
+            }, 100);
+            return () => clearTimeout(timeout);
         }
     }, [isAuthenticated, user, redirectBasedOnProfileStatus]);
 
@@ -72,6 +89,8 @@ export default function Login() {
     const onSubmit = async (data: LoginFormInputs) => {
         try {
             await login(data.username_or_email, data.password);
+            // Force sync auth state immediately after login
+            syncAuthState();
         } catch (err) {
             console.error('Error al iniciar sesión:', err);
         }
@@ -86,7 +105,8 @@ export default function Login() {
             // Obtener el tipo de perfil del localStorage (si existe)
             const profileType = localStorage.getItem('selectedProfileType') || 'patient';
             await loginWithGoogle(credentialResponse.credential, profileType);
-
+            // Force sync auth state immediately after Google login
+            syncAuthState();
         } catch (err) {
             console.error("Error con Google login:", err);
             setGoogleError("Error al iniciar sesión con Google. Por favor intenta nuevamente.");

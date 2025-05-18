@@ -1,7 +1,6 @@
 'use client';
 
 import React, { useEffect, useState } from "react";
-import Header from "@/components/Header";
 import Sidebar from "@/components/Sidebar";
 import Loading from "@/components/loading";
 import { ROUTES } from "@/routes/routePaths";
@@ -91,7 +90,7 @@ export default function ContentLayout({ children }: { children: React.ReactNode 
             <div className="flex h-screen bg-gray-50 dark:bg-gray-900">
                 <Sidebar />
                 <div className="flex flex-col flex-1 overflow-hidden">
-                    <Header />
+
                     <main className="flex-1 p-6 overflow-y-auto">
                         {children}
                     </main>

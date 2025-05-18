@@ -6,6 +6,7 @@ import { TbMessageCircle, TbReportMedical, TbUserPlus } from 'react-icons/tb';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/hooks/useAuth'; 
 import { ROUTES } from '@/routes/routePaths';
+import Header from '@/components/Header';
 
 export default function Home() {
     const router = useRouter();
@@ -26,7 +27,9 @@ export default function Home() {
     const isDoctor = user?.tipo === 'doctor'; // Verificar si el usuario es doctor
 
     return (
+
         <div className="flex flex-col items-center justify-center min-h-screen py-2 space-y-6">
+            <Header />
             <Card className="w-full max-w-md mx-auto">
                 <CardHeader>
                     <CardTitle>Asistente Médico Virtual</CardTitle>
