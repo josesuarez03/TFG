@@ -5,8 +5,8 @@ export const ROUTES = {
       ROOT_LOGIN: '/', // Ruta raíz como login
       REGISTER: '/auth/register',
       PROFILE_TYPE: '/auth/profile-type',
-      COMPLETE_PROFILE: '/auth/complete-profile',
       RECOVER_PASSWORD: '/auth/recover-password',
+      PROFILE_COMPLETE: '/auth/complete',
       VERIFY_CODE: '/auth/verify-code',
     },
     
@@ -14,7 +14,6 @@ export const ROUTES = {
     PROTECTED: {
       DASHBOARD: '/dashboard',
       PROFILE: '/profile',
-      PROFILE_COMPLETE: '/profile/complete',
       PROFILE_EDIT: '/profile/edit',
       PROFILE_CHANGE_PASSWORD: '/profile/change-password',
       PROFILE_DELETE_ACCOUNT: '/profile/delete-account',
