@@ -2,6 +2,7 @@ import React from "react";
 import ContentLayout from "@/components/layout/ContentLayout";
 import { ThemeProvider } from "@/components/theme-provider";
 import "@/styles/globals.css";
+import AuthStateSync from "@/components/AuthStateSync";
 
 export const metadata = {
     title: {
@@ -28,6 +29,7 @@ export default function RootLayout({
             </head>
             <body className="antialiased">
                 <ThemeProvider>
+                    <AuthStateSync />
                     <ContentLayout>{children}</ContentLayout>
                 </ThemeProvider>
             </body>
