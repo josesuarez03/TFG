@@ -33,7 +33,7 @@ export function middleware(request: NextRequest) {
 
   // Rutas importantes
   const dashboardPath = ROUTES.PROTECTED.DASHBOARD;
-  const profileCompletePath = ROUTES.PROTECTED.PROFILE_COMPLETE;
+  const profileCompletePath = ROUTES.PUBLIC.PROFILE_COMPLETE;
   const loginPath = ROUTES.PUBLIC.LOGIN;
 
 

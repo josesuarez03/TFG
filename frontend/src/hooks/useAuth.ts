@@ -101,7 +101,7 @@ export function useAuth() {
       // Verificar si el usuario necesita completar perfil
       if (userProfile && !userProfile.is_profile_completed) {
         console.log('Usuario necesita completar perfil, redirigiendo...');
-        router.push(ROUTES.PROTECTED.PROFILE_COMPLETE);
+        router.push(ROUTES.PUBLIC.PROFILE_COMPLETE);
       } else if (userProfile) {
         console.log('Perfil completo, redirigiendo al dashboard...');
         router.push(ROUTES.PROTECTED.DASHBOARD);
@@ -152,7 +152,7 @@ export function useAuth() {
       // Verificar si necesita completar perfil
       if (userProfile && !userProfile.is_profile_completed) {
         console.log('Usuario Google necesita completar perfil, redirigiendo...');
-        router.push(ROUTES.PROTECTED.PROFILE_COMPLETE);
+        router.push(ROUTES.PUBLIC.PROFILE_COMPLETE);
       } else if (userProfile) {
         console.log('Perfil Google completo, redirigiendo al dashboard...');
         router.push(ROUTES.PROTECTED.DASHBOARD);
@@ -228,9 +228,9 @@ export function useAuth() {
           if (userProfile && !userProfile.is_profile_completed) {
             // Verificar si ya estamos en la página de completar perfil para evitar redirecciones circulares
             const currentPath = window.location.pathname;
-            if (currentPath !== ROUTES.PROTECTED.PROFILE_COMPLETE) {
+            if (currentPath !== ROUTES.PUBLIC.PROFILE_COMPLETE) {
               console.log('Perfil incompleto, redirigiendo desde checkAuth...');
-              router.push(ROUTES.PROTECTED.PROFILE_COMPLETE);
+              router.push(ROUTES.PUBLIC.PROFILE_COMPLETE);
             }
           }
         } else {

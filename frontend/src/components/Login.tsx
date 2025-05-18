@@ -63,7 +63,7 @@ export default function Login() {
         
         if (!user.is_profile_completed) {
             console.log('Redirigiendo a completar perfil');
-            router.push(ROUTES.PROTECTED.PROFILE_COMPLETE);
+            router.push(ROUTES.PUBLIC.PROFILE_COMPLETE);
         } else if (fromRoute && fromRoute !== ROUTES.PUBLIC.LOGIN) {
             console.log('Redirigiendo a la ruta original:', fromRoute);
             router.push(fromRoute);
