@@ -26,42 +26,44 @@ export function middleware(request: NextRequest) {
   const profileCompletePath = ROUTES.PROTECTED.PROFILE_COMPLETE;
   const loginPath = ROUTES.PUBLIC.LOGIN;
 
-  // Si estamos en la ruta raíz y el usuario está autenticado, redirigir al dashboard
-  if (pathname === ROUTES.PUBLIC.ROOT_LOGIN || pathname === loginPath && isAuthenticated) {
-    return NextResponse.redirect(new URL(dashboardPath, request.url));
-  }
-  
-  // Si estamos en la ruta raíz y NO está autenticado, redirigir al login
-  if (pathname === ROUTES.PUBLIC.ROOT_LOGIN || pathname === loginPath && !isAuthenticated) {
-    return NextResponse.redirect(new URL(loginPath, request.url));
-  }
-  
-  // Allow direct access to specific public pages without authentication
-  if (pathMatches(pathname, ROUTES.PUBLIC)) {
-    // Si el usuario ya está autenticado y trata de acceder a páginas públicas, redirigirlo al dashboard
+  // Manejo de la ruta raíz
+  if (pathname === ROUTES.PUBLIC.ROOT_LOGIN) {
     if (isAuthenticated) {
-      // Si el perfil no está completo, redirigir a la página de completar perfil
       if (!isProfileCompleted) {
         return NextResponse.redirect(new URL(profileCompletePath, request.url));
       }
       return NextResponse.redirect(new URL(dashboardPath, request.url));
+    } else {
+      return NextResponse.redirect(new URL(loginPath, request.url));
     }
+  }
+  
+  // Si ya está autenticado y trata de acceder al login, redirigir al dashboard
+  if (pathname === loginPath && isAuthenticated) {
+    if (!isProfileCompleted) {
+      return NextResponse.redirect(new URL(profileCompletePath, request.url));
+    }
+    return NextResponse.redirect(new URL(dashboardPath, request.url));
+  }
+  
+  // Permitir acceso a páginas públicas sin autenticación
+  if (pathMatches(pathname, ROUTES.PUBLIC)) {
     return NextResponse.next();
   }
   
-  // Handle unauthenticated access to protected routes
+  // Verificar autenticación para rutas protegidas
   if (!isAuthenticated && (pathMatches(pathname, ROUTES.PROTECTED) || pathMatches(pathname, ROUTES.DOCTOR))) {
     const url = new URL(loginPath, request.url);
     url.searchParams.set('from', pathname);
     return NextResponse.redirect(url);
   }
   
-  // Handle doctor-specific routes
+  // Manejar rutas específicas de doctores
   if (isAuthenticated && pathMatches(pathname, ROUTES.DOCTOR) && userTypeCookie !== 'doctor') {
     return NextResponse.redirect(new URL(dashboardPath, request.url));
   }
   
-  // Check profile completion - don't redirect if they're already on the profile complete page
+  // Verificar completitud del perfil - no redirigir si ya están en la página de completar perfil
   if (isAuthenticated && !isProfileCompleted && pathname !== profileCompletePath) {
     return NextResponse.redirect(new URL(profileCompletePath, request.url));
   }
