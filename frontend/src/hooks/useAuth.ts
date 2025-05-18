@@ -175,21 +175,32 @@ export function useAuth() {
     }
   }, [fetchUserProfile, router]);
 
-  const logout = useCallback(() => {
+  // FIXED: Mejorado el manejo de errores en la función de logout
+  const logout = useCallback(async () => {
     console.log('Cerrando sesión...');
     
-    // Utilizar la función de logout exportada desde api.ts
-    apiLogout()
-      .catch(err => console.error('Error en logout API:', err))
-      .finally(() => {
-        // La función apiLogout ya limpia sessionStorage, pero aseguramos la limpieza completa
-        sessionStorage.removeItem('access_token');
-        sessionStorage.removeItem('refresh_token');
-        clearAuthCookies();
-        setUser(null);
-        setIsAuthenticated(false);
-        router.push(ROUTES.PUBLIC.LOGIN);
-      });
+    try {
+      // Utilizar la función de logout exportada desde api.ts
+      await apiLogout();
+      console.log('Sesión cerrada correctamente en el servidor');
+    } catch (err) {
+      console.error('Error en logout API:', err);
+      
+      // Mostrar más detalles sobre el error
+      if (axios.isAxiosError(err) && err.response) {
+        console.error('Error status:', err.response.status);
+        console.error('Error details:', err.response.data);
+      }
+    } finally {
+      // Siempre limpiar el estado local, aunque haya errores en el servidor
+      console.log('Limpiando estado de autenticación local');
+      sessionStorage.removeItem('access_token');
+      sessionStorage.removeItem('refresh_token');
+      clearAuthCookies();
+      setUser(null);
+      setIsAuthenticated(false);
+      router.push(ROUTES.PUBLIC.LOGIN);
+    }
   }, [router]);
 
   // Listen for auth changes from other components

@@ -186,24 +186,51 @@ export const completeProfile = async (data: unknown): Promise<UserProfile> => {
   }
 };
 
+// FIXED: Enviar el refresh token al cerrar sesión
 export const logout = async (): Promise<void> => {
   try {
-    await API.post('logout/');
+    // Obtener el refresh token
+    const refreshToken = sessionStorage.getItem('refresh_token');
+    
+    if (refreshToken) {
+      // Enviar el refresh token al backend
+      await API.post('logout/', { refresh: refreshToken });
+    } else {
+      // Si no hay refresh token, intentar cerrar sesión sin él
+      await API.post('logout/');
+    }
+    
+    // Limpiar el almacenamiento local independientemente del resultado
     sessionStorage.removeItem('access_token');
     sessionStorage.removeItem('refresh_token');
   } catch (error) {
     console.error('Error al cerrar sesión:', error);
+    // Limpiar tokens incluso si hay error
+    sessionStorage.removeItem('access_token');
+    sessionStorage.removeItem('refresh_token');
     throw error;
   }
 };
 
-export const deleteUser = async (password:string): Promise<void> => {
+// FIXED: Asegurar que se envía el password correctamente en la solicitud DELETE
+export const deleteUser = async (password: string): Promise<void> => {
   try {
-    await API.delete('account/delete/', {data: {password}});
+    // Intentar primero con el cuerpo de la solicitud
+    await API.delete('account/delete/', {
+      data: { password }
+    });
+    
+    // Limpiar tokens después de eliminar la cuenta
     sessionStorage.removeItem('access_token');
     sessionStorage.removeItem('refresh_token');
   } catch (error) {
     console.error('Error al eliminar el usuario:', error);
+    
+    // Imprimir más detalles sobre el error
+    if (axios.isAxiosError(error) && error.response) {
+      console.error('Detalles del error:', error.response.data);
+    }
+    
     throw error;
   }
 };
