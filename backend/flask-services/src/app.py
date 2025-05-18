@@ -1,12 +1,13 @@
-# Mejora en app.py para mejor gestión de WebSockets
-
 from flask import Flask, request
 from flask_cors import CORS
 from config.config import Config
 from routes import init_app, socketio
 import logging
+from services.chatbot.input_validate import setup_nltk
 
 logger = logging.getLogger(__name__)
+
+setup_nltk()
 
 def create_app(config_class=Config):
     """Crear y configurar la aplicación Flask con mejor soporte para WebSockets"""
