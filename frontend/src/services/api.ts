@@ -3,7 +3,7 @@ import { LoginResponse } from '@/types/auth';
 import { UserProfile, RegisterData, ProfileUpdateData } from '@/types/user';
 
 // Define la URL base de la API
-const API_URL = 'http://localhost:8000/';
+const API_URL = process.env.NEXT_PUBLIC_API_URL || '';
 
 const API = axios.create({
   baseURL: API_URL,
