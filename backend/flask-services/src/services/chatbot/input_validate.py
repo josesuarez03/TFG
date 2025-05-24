@@ -1,15 +1,23 @@
 import re
 import unicodedata
 from nltk.tokenize import word_tokenize
+import nltk
 from nltk.corpus import stopwords
 
-# Configuración de stopwords y lenguaje
+def setup_nltk():
+    nltk.download('punkt')
+    nltk.download('wordnet')
+    nltk.download('stopwords')
+    nltk.download('punkt_tab')
+
 try:
     stop_words = set(stopwords.words('spanish'))
 except LookupError:
-    import nltk
     nltk.download('stopwords')
     stop_words = set(stopwords.words('spanish'))
+
+# Palabras de saludo que deben permitirse aunque sean "stopwords"
+greeting_words = {"hola", "buenas", "buenos", "saludos", "hey", "hi", "hello"}
 
 # Palabras clave para restricciones
 diagnosis_keywords = ["diagnóstico", "enfermedad", "qué tengo", "qué me pasa"]
@@ -21,7 +29,7 @@ HARMFUL_PATTERNS = [
     r'javascript:',        # Prevenir ejecución de código
     r'onerror=',           # Bloquear eventos maliciosos
     r'\b(select|drop|union|insert|delete)\b',  # Prevenir inyección SQL
-    r'[^\w\s\u00C0-\u00FF.?!,]'  # Permitir solo caracteres alfanuméricos y signos de puntuación
+    r'[^\w\s\u00C0-\u00FF.?!,áéíóúüñ¿¡]'  # Permitir caracteres en español
 ]
 
 def normalize_text(text):
@@ -30,6 +38,16 @@ def normalize_text(text):
         char for char in unicodedata.normalize('NFKD', text)
         if unicodedata.category(char) != 'Mn'
     ).lower()
+
+def is_greeting_message(text):
+    """Verifica si el mensaje es un saludo simple."""
+    normalized = normalize_text(text.strip())
+    tokens = word_tokenize(normalized)
+    
+    # Si el mensaje tiene 1-3 palabras y contiene palabras de saludo
+    if len(tokens) <= 3:
+        return any(token in greeting_words for token in tokens)
+    return False
 
 def validate_input(user_message):
     """Valida la entrada del usuario con múltiples capas de verificación."""
@@ -52,15 +70,27 @@ def validate_input(user_message):
     # Análisis de tokens
     tokens = word_tokenize(normalized_message)
     
-    # Remover stopwords
+    # Verificar si es un saludo simple - permitir sin validación adicional
+    if is_greeting_message(user_message):
+        return True, ""
+    
+    # Remover stopwords para mensajes no-saludo
     filtered_tokens = [token for token in tokens if token not in stop_words]
     
-    # Verificar densidad de palabras significativas
-    if len(filtered_tokens) < 2:
-        return False, "El mensaje debe contener al menos dos palabras significativas."
+    # Verificar densidad de palabras significativas (más flexible)
+    if len(filtered_tokens) == 0 and len(tokens) > 3:
+        return False, "El mensaje debe contener al menos una palabra significativa."
+    
+    # Permitir mensajes cortos (1-3 palabras) aunque no tengan palabras "significativas"
+    if len(tokens) <= 3:
+        return True, ""
+    
+    # Para mensajes más largos, requerir al menos una palabra significativa
+    if len(filtered_tokens) == 0:
+        return False, "El mensaje debe contener al menos una palabra significativa."
     
     # Verificar repetición excesiva de caracteres
-    if re.search(r'(.)\1{3,}', user_message):
+    if re.search(r'(.)\1{4,}', user_message):  # Cambiado de 3 a 4 para ser menos restrictivo
         return False, "No se permiten repeticiones excesivas de caracteres."
     
     return True, ""
@@ -69,17 +99,21 @@ def analyze_message(user_message):
     """Analiza el mensaje después de la validación."""
     is_valid, error_message = validate_input(user_message)
     if not is_valid:
-        return "input_error", error_message
+        return ("input_error", error_message)
     
     normalized_message = normalize_text(user_message)
     tokens = word_tokenize(normalized_message)
     
-    if any(keyword in tokens for keyword in diagnosis_keywords):
-        return "diagnosis_restriction", ""
-    elif any(keyword in tokens for keyword in medication_keywords):
-        return "medication_restriction", ""
+    # Verificar si es un saludo
+    if is_greeting_message(user_message):
+        return ("greeting", "")
+    
+    if any(keyword in normalized_message for keyword in diagnosis_keywords):
+        return ("diagnosis_restriction", "")
+    elif any(keyword in normalized_message for keyword in medication_keywords):
+        return ("medication_restriction", "")
     else:
-        return "general_response", ""
+        return ("general_response", "")
 
 def generate_response(user_message):
     """Genera respuesta basada en el análisis del mensaje."""
@@ -87,6 +121,9 @@ def generate_response(user_message):
     
     if restriction_type == "input_error":
         return error_message
+    elif restriction_type == "greeting":
+        return ("¡Hola! Soy Hipo, tu asistente de triaje médico. "
+                "¿Cómo te sientes hoy? Por favor, cuéntame qué síntomas o molestias tienes.")
     elif restriction_type == "diagnosis_restriction":
         return ("No puedo proporcionar un diagnóstico médico. "
                 "Por favor, consulta con un profesional de la salud para obtener una evaluación adecuada.")
