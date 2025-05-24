@@ -2,7 +2,9 @@ import json
 import logging
 from datetime import datetime
 import uuid
-from data.connect import  mongo_db, redis_client
+from bson import Binary
+from bson.binary import UuidRepresentation
+from data.connect import mongo_db, redis_client
 
 # Configurar logger
 logger = logging.getLogger(__name__)
@@ -17,12 +19,24 @@ class ConversationalDatasetManager:
             logger.error(f"Error al inicializar ConversationalDatasetManager: {str(e)}")
             raise
 
+    def _uuid_to_binary(self, uuid_obj):
+        """Convierte un UUID a Binary para MongoDB"""
+        if isinstance(uuid_obj, str):
+            uuid_obj = uuid.UUID(uuid_obj)
+        return Binary.from_uuid(uuid_obj, UuidRepresentation.STANDARD)
+
+    def _binary_to_uuid(self, binary_obj):
+        """Convierte un Binary de MongoDB a UUID string"""
+        if isinstance(binary_obj, Binary):
+            return str(binary_obj.as_uuid())
+        return str(binary_obj)
+
     def add_conversation(self, user_id, medical_context, messages, symptoms, symptoms_pattern, pain_scale, triaje_level):
         try:
             conversation_id = str(uuid.uuid4())
             conversation = {
                 "user_id": user_id,
-                "_id": uuid.UUID(conversation_id),
+                "_id": self._uuid_to_binary(conversation_id),
                 "symptoms": symptoms,
                 "symptoms_pattern": symptoms_pattern,
                 "pain_scale": pain_scale,
@@ -51,7 +65,12 @@ class ConversationalDatasetManager:
     def get_conversations(self, user_id):
         try:
             conversations = self.collection.find({"user_id": user_id})
-            result = list(conversations)
+            result = []
+            for conv in conversations:
+                # Convertir Binary UUID de vuelta a string
+                if "_id" in conv and isinstance(conv["_id"], Binary):
+                    conv["_id"] = self._binary_to_uuid(conv["_id"])
+                result.append(conv)
             logger.info(f"Recuperadas {len(result)} conversaciones de MongoDB para el usuario {user_id}")
             return result
         except Exception as e:
@@ -70,8 +89,11 @@ class ConversationalDatasetManager:
                 logger.warning(f"Error al obtener de Redis, continuando con MongoDB: {str(redis_error)}")
                 
             # Si no está en cache, buscar en MongoDB
-            conversation = self.collection.find_one({"user_id": user_id, "_id": uuid.UUID(conversation_id)})
+            conversation = self.collection.find_one({"user_id": user_id, "_id": self._uuid_to_binary(conversation_id)})
             if conversation:
+                # Convertir Binary UUID de vuelta a string
+                if "_id" in conversation and isinstance(conversation["_id"], Binary):
+                    conversation["_id"] = self._binary_to_uuid(conversation["_id"])
                 logger.info(f"Conversación {conversation_id} recuperada de MongoDB para el usuario {user_id}")
             else:
                 logger.info(f"Conversación {conversation_id} no encontrada para el usuario {user_id}")
@@ -97,7 +119,7 @@ class ConversationalDatasetManager:
                 update_data["triaje_level"] = triaje_level
                 
             result = self.collection.update_one(
-                {"user_id": user_id, "_id": uuid.UUID(conversation_id)},
+                {"user_id": user_id, "_id": self._uuid_to_binary(conversation_id)},
                 {"$set": update_data}
             )
             
@@ -122,7 +144,7 @@ class ConversationalDatasetManager:
     def mark_conversation_inactive(self, user_id, conversation_id):
         try:
             result = self.collection.update_one(
-                {"user_id": user_id, "_id": uuid.UUID(conversation_id)},
+                {"user_id": user_id, "_id": self._uuid_to_binary(conversation_id)},
                 {"$set": {"active": False}}
             )
             
@@ -150,7 +172,7 @@ class ConversationalDatasetManager:
                 logger.warning(f"Error al eliminar de Redis: {str(redis_error)}")
             
             # Luego eliminar de MongoDB
-            result = self.collection.delete_one({"user_id": user_id, "_id": uuid.UUID(conversation_id)})
+            result = self.collection.delete_one({"user_id": user_id, "_id": self._uuid_to_binary(conversation_id)})
             logger.info(f"Conversación {conversation_id} eliminada de MongoDB para el usuario {user_id}, elementos eliminados: {result.deleted_count}")
             return result.deleted_count
         except Exception as e:
@@ -182,9 +204,9 @@ class ConversationalDatasetManager:
                 try:
                     cached_data = RedisCacheManager.obtener_conversacion(user_id, conversation_id)
                     if cached_data:
-                        # Asegurarse de que _id sea un UUID y no una string
+                        # Convertir string _id a Binary UUID para MongoDB
                         if isinstance(cached_data["_id"], str):
-                            cached_data["_id"] = uuid.UUID(cached_data["_id"])
+                            cached_data["_id"] = self._uuid_to_binary(cached_data["_id"])
                             
                         result = self.collection.replace_one(
                             {"user_id": user_id, "_id": cached_data["_id"]},
@@ -199,9 +221,9 @@ class ConversationalDatasetManager:
                 try:
                     all_cached = RedisCacheManager.obtener_todas_conversaciones(user_id)
                     for cached_data in all_cached:
-                        # Asegurarse de que _id sea un UUID y no una string
+                        # Convertir string _id a Binary UUID para MongoDB
                         if isinstance(cached_data["_id"], str):
-                            cached_data["_id"] = uuid.UUID(cached_data["_id"])
+                            cached_data["_id"] = self._uuid_to_binary(cached_data["_id"])
                             
                         self.collection.replace_one(
                             {"user_id": cached_data["user_id"], "_id": cached_data["_id"]},
@@ -237,7 +259,7 @@ class RedisCacheManager:
         try:
             data = {
                 "user_id": user_id,
-                "_id": conversation_id,
+                "_id": conversation_id,  # Mantener como string en Redis
                 "symptoms": symptoms,
                 "symptoms_pattern": symptoms_pattern,
                 "pain_scale": pain_scale,
@@ -289,6 +311,10 @@ class RedisCacheManager:
     def actualizar_conversacion(user_id, conversation_id, data):
         """Actualiza una conversación en Redis"""
         try:
+            # Asegurar que timestamp sea serializable
+            if 'timestamp' in data and isinstance(data['timestamp'], datetime):
+                data['timestamp'] = data['timestamp'].isoformat()
+            
             key = RedisCacheManager._get_key(user_id, conversation_id)
             redis_client.set(key, json.dumps(data), ex=RedisCacheManager.EXPIRATION_TIME)
             logger.debug(f"Conversación actualizada en Redis con clave: {key}")
