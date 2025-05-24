@@ -139,10 +139,6 @@ export const useSocketIO = (url: string, isAuthenticated?: boolean) => {
         }
     }, [socket]);
 
-    // Función para obtener información de debug
-    const getDebugInfo = useCallback(() => {
-        return socket ? socket.debugInfo() : null;
-    }, [socket]);
 
     return {
         messages,
@@ -153,7 +149,6 @@ export const useSocketIO = (url: string, isAuthenticated?: boolean) => {
         clearMessages,
         reconnect,
         reauthenticate,
-        getDebugInfo,
         socket
     };
 };

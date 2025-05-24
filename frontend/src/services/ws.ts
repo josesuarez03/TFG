@@ -111,8 +111,10 @@ class SocketIOService {
     } else if (data && typeof data === 'object') {
       const d = data as Record<string, unknown>;
       
-      // Buscar el contenido en diferentes posibles campos
-      if (typeof d.content === 'string') {
+      // PRIORIZAR ai_response que es lo que viene del servidor
+      if (typeof d.ai_response === 'string') {
+        message = d.ai_response;
+      } else if (typeof d.content === 'string') {
         message = d.content;
       } else if (typeof d.message === 'string') {
         message = d.message;
@@ -123,12 +125,22 @@ class SocketIOService {
       } else if (typeof d.response === 'string') {
         message = d.response;
       } else {
-        // Si es un objeto complejo, usar JSON.stringify para debug
-        message = JSON.stringify(data, null, 2);
-        console.log('📦 Objeto completo recibido:', data);
+        // Como fallback, mostrar solo el ai_response si existe, sino el objeto completo
+        if (d.ai_response) {
+          message = String(d.ai_response);
+        } else {
+          message = JSON.stringify(data, null, 2);
+          console.log('📦 Objeto completo recibido (sin ai_response):', data);
+        }
       }
     } else {
       message = String(data);
+    }
+
+    // Verificar que el mensaje no esté vacío
+    if (!message || !message.trim()) {
+      console.warn('⚠️ Mensaje vacío recibido, ignorando');
+      return;
     }
 
     // Notificar a todos los listeners
@@ -224,17 +236,7 @@ class SocketIOService {
     }
   }
 
-  debugInfo(): Record<string, unknown> {
-    return {
-      hasSocket: !!this.socket,
-      isConnected: this.isConnected(),
-      socketId: this.getSocketId(),
-      connectionState: this.getConnectionState(),
-      listenersCount: this.listeners.length,
-      url: this.url,
-      hasToken: !!sessionStorage.getItem('access_token')
-    };
-  }
+
 }
 
 export default SocketIOService;
