@@ -4,16 +4,7 @@ from config.config import Config
 import json
 
 def call_claude(prompt, triage_level=None, max_tokens=500, temperature=0.1, initial_prompt=None):
-    """
-    Call Claude API with proper parameter handling
-    
-    Args:
-        prompt: Either a string or dict with context information
-        triage_level: Triage classification level (optional)
-        max_tokens: Maximum tokens for response
-        temperature: Temperature for response generation
-        initial_prompt: Initial system prompt to include
-    """
+
     client = boto3.client(
         service_name='bedrock-runtime', 
         region_name=Config.AWS_REGION
@@ -63,13 +54,7 @@ def call_claude(prompt, triage_level=None, max_tokens=500, temperature=0.1, init
         raise
 
 def _format_context_prompt(context_dict, initial_prompt=None):
-    """
-    Format context dictionary into a structured prompt
-    
-    Args:
-        context_dict: Dictionary containing context information
-        initial_prompt: Optional initial system prompt
-    """
+
     prompt_parts = []
     
     # Add initial prompt if available

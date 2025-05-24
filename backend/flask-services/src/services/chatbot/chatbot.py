@@ -68,14 +68,21 @@ class Chatbot:
             if self.user_data:
                 self.context.update(self.user_data)
             
-            # Agregar el prompt inicial al contexto si se proporciona
-            if self.initial_prompt:
-                self.context['initial_prompt'] = self.initial_prompt
+            # Add user input to context for Claude
+            self.context['user_input'] = self.user_input
+            
+            # Add medical entities to context
+            if self.entities:
+                self.context['medical_entities'] = self.entities
             
             # Fix: TriageClassification constructor expects specific parameters
             # Extract symptoms and pain level from entities or context
             symptoms = self._extract_symptoms_from_entities(self.entities)
             pain_level = self._extract_pain_level_from_context()
+            
+            # Add extracted information to context
+            self.context['symptoms'] = symptoms
+            self.context['pain_level'] = pain_level
             
             # Crear instancia de TriageClassification con los parámetros correctos
             self.triage = TriageClassification(
@@ -84,11 +91,12 @@ class Chatbot:
                 environment=self.context.get('environment', 'general')
             )
             
-            # Obtener respuesta del modelo Claude
-            if self.initial_prompt:
-                self.response = call_claude(self.context, self.triage.triage_level, initial_prompt=self.initial_prompt)
-            else:
-                self.response = call_claude(self.context, self.triage.triage_level)
+            # Fixed: Call Claude with proper parameters
+            self.response = call_claude(
+                prompt=self.context,
+                triage_level=self.triage.triage_level,
+                initial_prompt=self.initial_prompt
+            )
             
             # Handle severe cases
             if self.triage.triage_level == 'Severo':
