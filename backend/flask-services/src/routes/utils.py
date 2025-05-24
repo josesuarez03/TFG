@@ -117,7 +117,9 @@ def process_message_logic(user_id, user_message, user_data, conversation_id):
             triaje_level
         )
 
-    encrypted_conversation_id = Encryption.encrypt_string(conversation_id)
+    # Create an instance of Encryption class (without JWT token for general use)
+    encryption_instance = Encryption()
+    encrypted_conversation_id = encryption_instance.encrypt_string(conversation_id)
 
     return {
         "user_message": user_message,
