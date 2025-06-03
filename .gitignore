@@ -514,3 +514,4 @@ next-env.d.ts
 *.zip
 *.tar.gz
 data
+*.pdf
