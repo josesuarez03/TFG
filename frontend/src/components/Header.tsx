@@ -11,8 +11,8 @@ export default function Header() {
     };
 
     return (
-        <header className="flex items-center justify-between p-4 bg-gray-800 text-white">
-            <h1 className="text-2xl font-bold">
+        <header className="flex items-center justify-between p-4 ">
+            <h1 className="text-4xl font-bold">
                 Bienvenido, <span className="font-semibold">{getName()}</span>
             </h1>
         </header>
