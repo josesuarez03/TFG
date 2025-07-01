@@ -1,0 +1,131 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 210 25% 98%;
+    --foreground: 210 40% 98%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 210 40% 2%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 210 40% 2%;
+
+    --primary: 206 69% 47%;  /* #2583CC */
+    --primary-foreground: 210 40% 98%;
+
+    --secondary: 216 23% 87%;  /* #D5DEE9 */
+    --secondary-foreground: 210 40% 2%;
+
+    --muted: 210 40% 96.1%;
+    --muted-foreground: 215.4 16.3% 46.9%;
+
+    --accent: 209 58% 93%;    /* Basado en un tono claro de los azules */
+    --accent-foreground: 210 40% 2%;
+
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 210 40% 98%;
+
+    --border: 214.3 31.8% 91.4%;
+    --input: 214.3 31.8% 91.4%;
+    --ring: 206 69% 47%;     /* #2583CC */
+
+    --chart-1: 206 69% 47%;   /* #2583CC */
+    --chart-2: 216 23% 87%;   /* #D5DEE9 */
+    --chart-3: 209 77% 20%;   /* #083560 */
+    --chart-4: 195 89% 64%;   /* #53C4F5 */
+    --chart-5: 210 44% 60%;   /* #7097BE */
+
+    --radius: 0.5rem;
+  }
+
+  .dark {
+    --background: 209 77% 20%; /* #083560 */
+    --foreground: 210 40% 98%;
+
+    --card: 210 40% 13%;
+    --card-foreground: 210 40% 98%;
+
+    --popover: 210 40% 13%;
+    --popover-foreground: 210 40% 98%;
+
+    --primary: 195 89% 64%;   /* #53C4F5 */
+    --primary-foreground: 209 77% 20%; /* #083560 */
+
+    --secondary: 215 46% 60%;  /* #7097BE */
+    --secondary-foreground: 210 40% 98%;
+
+    --muted: 217 33% 30%;
+    --muted-foreground: 215 20.2% 65.1%;
+
+    --accent: 217 33% 38%;    /* #48547C */
+    --accent-foreground: 210 40% 98%;
+
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 210 40% 98%;
+
+    --border: 217 33% 25%;
+    --input: 217 33% 25%;
+    --ring: 195 89% 64%;      /* #53C4F5 */
+  }
+}
+
+/* Clases directas para los colores personalizados */
+.bg-blue-primary {
+  background-color: #2583CC;
+}
+.bg-gray-light {
+  background-color: #D5DEE9;
+}
+.bg-blue-dark {
+  background-color: #083560;
+}
+.bg-blue-sky {
+  background-color: #53C4F5;
+}
+.bg-blue-medium {
+  background-color: #7097BE;
+}
+.bg-blue-violet {
+  background-color: #48547C;
+}
+
+.text-blue-primary {
+  color: #2583CC;
+}
+.text-gray-light {
+  color: #D5DEE9;
+}
+.text-blue-dark {
+  color: #083560;
+}
+.text-blue-sky {
+  color: #53C4F5;
+}
+.text-blue-medium {
+  color: #7097BE;
+}
+.text-blue-violet {
+  color: #48547C;
+}
+
+.border-blue-primary {
+  border-color: #2583CC;
+}
+.border-gray-light {
+  border-color: #D5DEE9;
+}
+.border-blue-dark {
+  border-color: #083560;
+}
+.border-blue-sky {
+  border-color: #53C4F5;
+}
+.border-blue-medium {
+  border-color: #7097BE;
+}
+.border-blue-violet {
+  border-color: #48547C;
+}
