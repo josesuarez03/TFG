@@ -1,0 +1,18 @@
+confidence_threshold: 0.65
+case_conflict_delta: 0.1
+coverage_min_for_advise: 0.8
+min_intent_for_tree: 0.25
+default_triage: Leve
+pain_thresholds:
+  moderate: 5
+  severe: 8
+severe_markers:
+  - dolor de pecho intenso
+  - dificultad para respirar
+  - pérdida de consciencia
+  - convulsiones
+  - intento suicida
+moderate_markers:
+  - vómitos persistentes
+  - mareo intenso
+  - fiebre alta

@@ -4,13 +4,10 @@ from flask import request
 from flask_socketio import emit, join_room, leave_room
 from . import socketio
 from routes.utils import process_message_logic, conversational_dataset_manager
-from services.security.encryption import Encryption
 from services.auth.auth import get_user_id_from_token 
 
 # Configurar logger
 logger = logging.getLogger(__name__)
-
-encryption_instance = Encryption()
 
 @socketio.on('connect')
 def handle_connect():
@@ -85,20 +82,17 @@ def handle_chat_message(data):
             return
 
         user_data = data.get('context', {})
-        conversation_id_encrypted = data.get('conversation_id')
-        conversation_id_decrypted = None
-
-        if conversation_id_encrypted:
-            try:
-                conversation_id_decrypted = encryption_instance.decrypt_string(conversation_id_encrypted)
-            except ValueError as e:
-                logger.error(f"Error desencriptando conversation_id '{conversation_id_encrypted}' para SID {sid}: {str(e)}")
-                emit('error', {"error": f"Formato de conversation_id inválido: {str(e)}"}, room=sid)
-                return
+        conversation_id_decrypted = data.get('conversation_id')
         
         emit('typing', {'status': 'bot is typing'}, room=sid)
         
-        result, status_code = process_message_logic(user_id, user_message, user_data, conversation_id_decrypted)
+        result, status_code = process_message_logic(
+            user_id,
+            user_message,
+            user_data,
+            conversation_id_decrypted,
+            jwt_token=token_from_payload,
+        )
         
         if status_code != 200:
             emit('error', result, room=sid)
@@ -120,14 +114,9 @@ def on_join_conversation(data):
 
     conversation_id_encrypted = data.get('conversation_id')
     if conversation_id_encrypted:
-        try:
-            conversation_id_decrypted = encryption_instance.decrypt_string(conversation_id_encrypted)
-            join_room(conversation_id_decrypted)
-            emit('room_joined', {'room': conversation_id_decrypted, 'status': 'joined'}, room=sid)
-            logger.info(f"Cliente {sid} se unió a la conversación {conversation_id_decrypted}")
-        except ValueError as e:
-            logger.error(f"Error desencriptando conversation_id para join '{conversation_id_encrypted}' para SID {sid}: {str(e)}")
-            emit('error', {"error": f"Formato de conversation_id inválido para join: {str(e)}"}, room=sid)
+        join_room(conversation_id_encrypted)
+        emit('room_joined', {'room': conversation_id_encrypted, 'status': 'joined'}, room=sid)
+        logger.info(f"Cliente {sid} se unió a la conversación {conversation_id_encrypted}")
     else:
         logger.warning(f"No se proporcionó conversation_id para join_conversation por SID {sid}")
         emit('error', {"error": "conversation_id es requerido."}, room=sid)
@@ -143,14 +132,9 @@ def on_leave_conversation(data):
 
     conversation_id_encrypted = data.get('conversation_id')
     if conversation_id_encrypted:
-        try:
-            conversation_id_decrypted = encryption_instance.decrypt_string(conversation_id_encrypted)
-            leave_room(conversation_id_decrypted)
-            emit('room_left', {'room': conversation_id_decrypted, 'status': 'left'}, room=sid)
-            logger.info(f"Cliente {sid} abandonó la conversación {conversation_id_decrypted}")
-        except ValueError as e:
-            logger.error(f"Error desencriptando conversation_id para leave '{conversation_id_encrypted}' para SID {sid}: {str(e)}")
-            emit('error', {"error": f"Formato de conversation_id inválido para leave: {str(e)}"}, room=sid)
+        leave_room(conversation_id_encrypted)
+        emit('room_left', {'room': conversation_id_encrypted, 'status': 'left'}, room=sid)
+        logger.info(f"Cliente {sid} abandonó la conversación {conversation_id_encrypted}")
     else:
         logger.warning(f"No se proporcionó conversation_id para leave_conversation por SID {sid}")
         emit('error', {"error": "conversation_id es requerido."}, room=sid)
@@ -186,16 +170,7 @@ def handle_sync_request(data):
         else:
             logger.info(f"Usuario {user_id} identificado para sync_request de SID {sid}.")
             
-        conversation_id_encrypted = data.get('conversation_id')
-        conversation_id_decrypted = None 
-
-        if conversation_id_encrypted:
-            try:
-                conversation_id_decrypted = encryption_instance.decrypt_string(conversation_id_encrypted)
-            except ValueError as e:
-                logger.error(f"Error desencriptando conversation_id para sync '{conversation_id_encrypted}' para SID {sid}: {str(e)}")
-                emit('sync_error', {"error": f"Formato de conversation_id inválido para sync: {str(e)}"}, room=sid)
-                return
+        conversation_id_decrypted = data.get('conversation_id')
         
         # Asumo que sync_from_redis_to_mongo puede manejar conversation_id_decrypted siendo None (para todas las conversaciones del usuario)
         conversational_dataset_manager.sync_from_redis_to_mongo(user_id, conversation_id_decrypted)

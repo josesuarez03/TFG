@@ -1,0 +1,43 @@
+case_id: headache_case
+name: Cefalea
+intent_keywords:
+  - dolor de cabeza
+  - cefalea
+  - migraña
+  - jaqueca
+required_fields:
+  - onset
+  - duration
+  - pain_intensity
+  - associated_symptoms
+  - neurologic_red_flags
+tree:
+  - id: headache_q1
+    field: onset
+    question: "¿El dolor de cabeza comenzó de forma súbita o gradual?"
+    triage_hint: moderate
+    rule_id: headache_rule_onset
+  - id: headache_q2
+    field: duration
+    question: "¿Desde cuándo tienes este dolor de cabeza?"
+    triage_hint: moderate
+    rule_id: headache_rule_duration
+  - id: headache_q3
+    field: pain_intensity
+    question: "En una escala del 1 al 10, ¿qué intensidad tiene ahora?"
+    triage_hint: severe
+    rule_id: headache_rule_pain_intensity
+  - id: headache_q4
+    field: associated_symptoms
+    question: "¿Se acompaña de náuseas, vómitos, sensibilidad a la luz, visión borrosa o mareo?"
+    triage_hint: moderate
+    rule_id: headache_rule_associated
+  - id: headache_q5
+    field: neurologic_red_flags
+    question: "¿Has notado debilidad, dificultad para hablar, desmayo, fiebre alta o rigidez de cuello?"
+    triage_hint: severe
+    rule_id: headache_rule_neuro_flags
+advice:
+  Leve: "Con la información disponible parece un cuadro no urgente. Mantente hidratado/a, evita pantallas un tiempo y descansa. Si empeora, vuelve a escribir o consulta presencial."
+  Moderado: "Tus síntomas requieren valoración médica prioritaria en las próximas horas. Si el dolor aumenta o aparecen señales neurológicas, acude a urgencias."
+  Severo: "El patrón descrito puede ser de alto riesgo. Acude a urgencias de inmediato o llama al 911."

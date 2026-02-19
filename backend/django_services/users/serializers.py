@@ -221,7 +221,7 @@ class RequiredOAuthUserSerializer(serializers.Serializer):
 class ChatbotAnalysisSerializer(serializers.Serializer):
     """Serializador para validar datos del análisis del chatbot"""
     triaje_level = serializers.CharField(required=False, allow_null=True)
-    pain_scale = serializers.IntegerField(required=False, allow_null=True)
+    pain_scale = serializers.IntegerField(required=False, allow_null=True, min_value=0, max_value=10)
     medical_context = serializers.CharField(required=False, allow_null=True)
     allergies = serializers.CharField(required=False, allow_null=True)
     medications = serializers.CharField(required=False, allow_null=True)
@@ -230,10 +230,6 @@ class ChatbotAnalysisSerializer(serializers.Serializer):
 
 class PasswordResetRequestSerializer(serializers.Serializer):
     email = serializers.EmailField(required=True)
-    def validate_email(self, value):
-        if not User.objects.filter(email=value).exists():
-            raise serializers.ValidationError("No existe un usuario con este correo electrónico.")
-        return value
 
 class PasswordResetVerifySerializer(serializers.Serializer):
     email = serializers.EmailField(required=True)

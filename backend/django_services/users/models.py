@@ -1,6 +1,7 @@
 import uuid
 from django.db import models
 from django.contrib.auth.models import AbstractUser
+from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 from common.security.utils import sanitize_input
 
@@ -178,8 +179,6 @@ class Patient(models.Model):
         super().save(*args, **kwargs)
 
     def update_from_chatbot_analysis(self, analysis_data, created_by=None):
-        import datetime
-        
         # Campos que pueden ser actualizados desde el chatbot
         chatbot_fields = [
             'triaje_level', 'pain_scale', 'medical_context',
@@ -217,7 +216,7 @@ class Patient(models.Model):
                     fields_updated.append(field)
             
             # Registrar la fecha del análisis
-            self.last_chatbot_analysis = datetime.datetime.now()
+            self.last_chatbot_analysis = timezone.now()
             fields_updated.append('last_chatbot_analysis')
             
             # Resetear validación médica cuando se actualizan datos por chatbot

@@ -1,0 +1,44 @@
+case_id: anxiety_case
+name: Ansiedad o Estrés Psicológico
+intent_keywords:
+  - ansiedad
+  - estrés
+  - ataque de pánico
+  - nervios
+  - angustia
+required_fields:
+  - duration
+  - triggers
+  - sleep_impact
+  - functional_impact
+  - physical_symptoms
+tree:
+  - id: anxiety_q1
+    field: duration
+    question: "¿Desde cuándo te sientes así?"
+    triage_hint: moderate
+    rule_id: anxiety_rule_duration
+  - id: anxiety_q2
+    field: triggers
+    question: "¿Hay algo que lo desencadene o lo empeore (trabajo, estudio, conflictos)?"
+    triage_hint: moderate
+    rule_id: anxiety_rule_triggers
+  - id: anxiety_q3
+    field: sleep_impact
+    question: "¿Esto está afectando tu sueño?"
+    triage_hint: moderate
+    rule_id: anxiety_rule_sleep
+  - id: anxiety_q4
+    field: functional_impact
+    question: "¿Qué tanto afecta tu funcionamiento diario (trabajo, estudio, relaciones)?"
+    triage_hint: moderate
+    rule_id: anxiety_rule_functional
+  - id: anxiety_q5
+    field: physical_symptoms
+    question: "¿Presentas palpitaciones, opresión en el pecho, temblor o dificultad para respirar?"
+    triage_hint: moderate
+    rule_id: anxiety_rule_physical
+advice:
+  Leve: "Por ahora parece un cuadro leve. Practica respiración lenta, limita cafeína y mantén rutina de sueño. Si persiste, busca apoyo profesional."
+  Moderado: "Tus síntomas justifican evaluación de salud mental en breve. Considera consulta psicológica/psiquiátrica prioritaria."
+  Severo: "Este cuadro puede requerir atención urgente. Si hay riesgo de hacerte daño o pérdida de control, llama al 911 de inmediato."

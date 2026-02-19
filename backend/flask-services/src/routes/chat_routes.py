@@ -3,7 +3,6 @@ import logging
 from . import bp
 from routes.utils import process_message_logic, conversational_dataset_manager
 from services.auth.auth import get_user_id_token
-from services.security.encryption import Encryption
 from services.api.send_api import send_data_to_django
 from services.process_data.medical_data import MedicalDataProcessor
 
@@ -24,16 +23,10 @@ def process_message():
     user_message = data.get('message', '')
     user_data = data.get('context', {})
     conversation_id = data.get('conversation_id', None)
+    auth_header = request.headers.get("Authorization")
+    token = auth_header.split(" ", 1)[1] if auth_header and auth_header.lower().startswith("bearer ") else None
     
-    try:
-
-        if conversation_id:
-            conversation_id = Encryption.decrypt_string(conversation_id)
-
-    except ValueError as e:
-        return jsonify({"error": str(e)}), 400
-
-    result, status_code = process_message_logic(user_id, user_message, user_data, conversation_id)
+    result, status_code = process_message_logic(user_id, user_message, user_data, conversation_id, jwt_token=token)
     
     if status_code != 200:
         return jsonify(result), status_code
@@ -66,8 +59,8 @@ def get_user_conversations():
         logger.error(f"Error al obtener conversaciones: {str(e)}")
         return jsonify({"error": f"Error al obtener conversaciones: {str(e)}"}), 500
 
-@bp.route('/conversation/<encrypted_conversation_id>', methods=['GET'])
-def get_conversation(encrypted_conversation_id):
+@bp.route('/conversation/<conversation_id>', methods=['GET'])
+def get_conversation(conversation_id):
     # Obtener user_id del token JWT
     user_id = get_user_id_token(request)
     
@@ -79,7 +72,6 @@ def get_conversation(encrypted_conversation_id):
         return jsonify({"error": "Se requiere autenticación válida."}), 401
     
     try:
-        conversation_id = Encryption.decrypt_string(encrypted_conversation_id)
         conversation = conversational_dataset_manager.get_conversation(user_id, conversation_id)
         if not conversation:
             return jsonify({"error": "Conversación no encontrada."}), 404
@@ -95,8 +87,8 @@ def get_conversation(encrypted_conversation_id):
         logger.error(f"Error al obtener conversación: {str(e)}")
         return jsonify({"error": f"Error al obtener conversación: {str(e)}"}), 500
 
-@bp.route('/conversation/<encrypted_conversation_id>', methods=['DELETE'])
-def delete_conversation(encrypted_conversation_id):
+@bp.route('/conversation/<conversation_id>', methods=['DELETE'])
+def delete_conversation(conversation_id):
     # Obtener user_id del token JWT
     user_id = get_user_id_token(request)
     
@@ -108,7 +100,6 @@ def delete_conversation(encrypted_conversation_id):
         return jsonify({"error": "Se requiere autenticación válida."}), 401
     
     try:
-        conversation_id = Encryption.decrypt_string(encrypted_conversation_id)
         deleted = conversational_dataset_manager.delete_conversation(user_id, conversation_id)
         if not deleted:
             return jsonify({"error": "Conversación no encontrada o no pudo ser eliminada."}), 404
@@ -140,7 +131,7 @@ def sync_redis_to_mongo():
         logger.error(f"Error en la sincronización: {str(e)}")
         return jsonify({"error": f"Error en la sincronización: {str(e)}"}), 500
     
-@bp.route('process_medical_data', methods=['POST'])
+@bp.route('/process_medical_data', methods=['POST'])
 def process_medical_data():
 
     user_id = get_user_id_token(request)
@@ -153,30 +144,28 @@ def process_medical_data():
         return jsonify({"error": "Se requiere autenticación válida."}), 401
     
     conversation_id = data.get('conversation_id')
-    django_api_url = data.get('django_api_url', None)
+    django_api_url = data.get('django_api_url')
     
     if not conversation_id:
         return jsonify({"error": "Se requiere ID de conversación"}), 400
     
-    if not django_api_url:
-        return jsonify({"error": "Se requiere URL de API de Django"}), 400
-    
     try:
-        # Decrypt conversation ID if encrypted
-        try:
-            conversation_id = Encryption.decrypt_string(conversation_id)
-        except ValueError:
-            # If not encrypted or invalid, use as is
-            pass
-        
         # Process the medical data from conversation
-        medical_data = MedicalDataProcessor.process_medical_data(user_id, conversation_id)
+        processor = MedicalDataProcessor(user_id)
+        medical_data = processor.process_medical_data(user_id, conversation_id)
         
         if not medical_data or 'error' in medical_data:
             return jsonify(medical_data or {"error": "No se pudo procesar la conversación."}), 400
         
         # Send processed data to Django for storage
-        django_response = send_data_to_django(user_id, medical_data)
+        auth_header = request.headers.get("Authorization")
+        token = auth_header.split(" ", 1)[1] if auth_header and auth_header.lower().startswith("bearer ") else None
+        django_response = send_data_to_django(
+            user_id,
+            medical_data,
+            jwt_token=token,
+            base_url=django_api_url,
+        )
         
         return jsonify({
             "success": True,

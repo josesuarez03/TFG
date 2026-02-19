@@ -1,5 +1,4 @@
 from config.config import Config
-import pymongo
 from pymongo import MongoClient
 from bson.codec_options import CodecOptions
 from bson.binary import UuidRepresentation
@@ -16,6 +15,11 @@ codec_options = CodecOptions(uuid_representation=UuidRepresentation.STANDARD)
 mongo_db = mongo_client[Config.MONGO_DB].with_options(codec_options=codec_options)
 
 redis_client = redis.Redis(host=Config.REDIS_HOST, port=Config.REDIS_PORT, db=Config.REDIS_DB)
+context_redis_client = redis.Redis(
+    host=Config.REDIS_HOST,
+    port=Config.REDIS_PORT,
+    db=Config.CHAT_REDIS_DB_CONTEXT,
+)
 
 # Verificar conexiones
 try:
@@ -29,3 +33,9 @@ try:
     print("✅ Conexión exitosa a Redis")
 except Exception as e:
     print(f"❌ Error conectando a Redis: {e}")
+
+try:
+    context_redis_client.ping()  # Prueba la conexión a Redis para contexto
+    print("✅ Conexión exitosa a Redis (contexto)")
+except Exception as e:
+    print(f"❌ Error conectando a Redis de contexto: {e}")

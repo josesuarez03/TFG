@@ -1,0 +1,52 @@
+{
+  "case_id": "alcohol_case",
+  "name": "Alcoholismo y Abstinencia",
+  "intent_keywords": [
+    "alcohol",
+    "beber",
+    "abstinencia",
+    "temblor",
+    "resaca"
+  ],
+  "required_fields": [
+    "consumption_pattern",
+    "last_intake",
+    "withdrawal_symptoms",
+    "functional_impact"
+  ],
+  "tree": [
+    {
+      "id": "alcohol_q1",
+      "field": "consumption_pattern",
+      "question": "¿Con qué frecuencia y cantidad consumes alcohol?",
+      "triage_hint": "moderate",
+      "rule_id": "alcohol_rule_pattern"
+    },
+    {
+      "id": "alcohol_q2",
+      "field": "last_intake",
+      "question": "¿Cuándo fue tu última ingesta de alcohol?",
+      "triage_hint": "moderate",
+      "rule_id": "alcohol_rule_last_intake"
+    },
+    {
+      "id": "alcohol_q3",
+      "field": "withdrawal_symptoms",
+      "question": "¿Tienes síntomas de abstinencia como temblor, sudoración, náuseas, ansiedad o alucinaciones?",
+      "triage_hint": "severe",
+      "rule_id": "alcohol_rule_withdrawal"
+    },
+    {
+      "id": "alcohol_q4",
+      "field": "functional_impact",
+      "question": "¿Cómo está afectando esto a tu trabajo/estudio o vida familiar?",
+      "triage_hint": "moderate",
+      "rule_id": "alcohol_rule_impact"
+    }
+  ],
+  "advice": {
+    "Leve": "La situación parece no urgente, pero requiere seguimiento. Considera reducir consumo y buscar apoyo profesional para prevenir progresión.",
+    "Moderado": "Se recomienda evaluación médica en las próximas 24 horas para valorar riesgo de abstinencia y plan terapéutico.",
+    "Severo": "Hay riesgo de complicaciones por abstinencia. Acude a urgencias de inmediato o llama al 911."
+  }
+}

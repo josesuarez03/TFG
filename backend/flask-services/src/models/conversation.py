@@ -103,7 +103,7 @@ class ConversationalDatasetManager:
             raise
 
     def update_conversation(self, user_id, conversation_id, messages=None, symptoms=None, 
-                           symptoms_pattern=None, pain_scale=None, triaje_level=None):
+                           symptoms_pattern=None, pain_scale=None, triaje_level=None, medical_context=None):
         try:
             update_data = {"timestamp": datetime.now()}
             
@@ -117,6 +117,8 @@ class ConversationalDatasetManager:
                 update_data["pain_scale"] = pain_scale
             if triaje_level:
                 update_data["triaje_level"] = triaje_level
+            if medical_context is not None:
+                update_data["medical_context"] = medical_context
                 
             result = self.collection.update_one(
                 {"user_id": user_id, "_id": self._uuid_to_binary(conversation_id)},
@@ -246,8 +248,8 @@ class RedisCacheManager:
         """Genera la clave para Redis"""
         try:
             if conversation_id:
-                return f"conversation:{user_id}:{conversation_id}"
-            return f"user:{user_id}"
+                return f"chat:conv:{user_id}:{conversation_id}"
+            return f"chat:idx:user:{user_id}"
         except Exception as e:
             logger.error(f"Error al generar clave Redis: {str(e)}")
             raise

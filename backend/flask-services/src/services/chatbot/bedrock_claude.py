@@ -68,6 +68,53 @@ def _format_context_prompt(context_dict, initial_prompt=None):
     # Add user input
     if 'user_input' in context_dict:
         prompt_parts.append(f"Usuario: {context_dict['user_input']}")
+
+    if context_dict.get("interaction_style"):
+        prompt_parts.append(
+            "Estilo de interacción:\n"
+            f"- interaction_style: {context_dict.get('interaction_style')}\n"
+            f"- max_questions_per_turn: {context_dict.get('max_questions_per_turn', 2)}\n"
+            f"- intro_mode: {context_dict.get('intro_mode', 'brief_context_plus_one_question')}\n"
+            "- No hagas listas largas de preguntas.\n"
+            "- Responde de forma breve (2-5 líneas).\n"
+            "- Haz máximo 1 o 2 preguntas en este turno."
+        )
+
+    if context_dict.get("conversation_summary"):
+        prompt_parts.append(f"Resumen acumulado de conversación:\n{context_dict['conversation_summary']}")
+
+    if context_dict.get("recent_turns"):
+        recent_lines = []
+        for turn in context_dict["recent_turns"]:
+            recent_lines.append(f"Paciente: {turn.get('user_message', '')}")
+            recent_lines.append(f"Asistente: {turn.get('assistant_message', '')}")
+        if recent_lines:
+            prompt_parts.append("Últimos turnos relevantes:\n" + "\n".join(recent_lines))
+
+    if context_dict.get("semantic_context"):
+        semantic_lines = []
+        for item in context_dict["semantic_context"]:
+            txt = item.get("text", "")
+            score = item.get("score", 0)
+            semantic_lines.append(f"[sim={score:.3f}] {txt}")
+        if semantic_lines:
+            prompt_parts.append("Contexto semántico recuperado:\n" + "\n".join(semantic_lines))
+
+    if context_dict.get("global_semantic_context"):
+        global_semantic_lines = []
+        for item in context_dict["global_semantic_context"]:
+            txt = item.get("text", "")
+            score = item.get("score", 0)
+            cid = item.get("conversation_id", "")
+            global_semantic_lines.append(f"[sim={score:.3f}] ({cid}) {txt}")
+        if global_semantic_lines:
+            prompt_parts.append("Memoria global del paciente (otras conversaciones):\n" + "\n".join(global_semantic_lines))
+
+    if context_dict.get("global_mongo_context"):
+        prompt_parts.append("Resumen global Mongo del paciente:\n" + json.dumps(context_dict["global_mongo_context"], ensure_ascii=False))
+
+    if context_dict.get("postgres_context"):
+        prompt_parts.append("Contexto clínico canónico (Postgres/Django):\n" + json.dumps(context_dict["postgres_context"], ensure_ascii=False))
     
     # Add medical context
     if 'medical_entities' in context_dict:
@@ -88,5 +135,13 @@ def _format_context_prompt(context_dict, initial_prompt=None):
     # Add environment context
     if 'environment' in context_dict:
         prompt_parts.append(f"Contexto: {context_dict['environment']}")
+
+    if context_dict.get("questions_selected"):
+        prompt_parts.append(
+            "Preguntas seleccionadas para este turno:\n"
+            + "\n".join(f"- {q}" for q in context_dict["questions_selected"])
+        )
+    elif context_dict.get("missing_questions"):
+        prompt_parts.append(f"Cantidad de datos faltantes: {len(context_dict['missing_questions'])}")
     
     return "\n".join(prompt_parts) if prompt_parts else "Hola, ¿en qué puedo ayudarte?"

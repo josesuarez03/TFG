@@ -1,20 +1,24 @@
-from flask import session
 from services.chatbot.comprehend_medical import detect_entities
 
-def init_context(text, user_data=None):
-    # Detect entities from the input text
+def init_context(text, user_data=None, existing_context=None):
     entities = detect_entities(text)
 
-    # Get existing context from session or create new one
-    context = session.get("context", {
+    context = existing_context.copy() if isinstance(existing_context, dict) else {
         "name": None,
         "age": None,
         "sex": None,
         "location": None,
         "occupation": None,
         "hobbies": None,
-        "lifestyle": None
-    })
+        "lifestyle": None,
+        "chief_complaint": None,
+        "symptom_duration": None,
+        "pain_level_reported": None,
+        "red_flags_checked": None,
+        "current_medications": None,
+        "known_allergies": None,
+        "medical_history_known": None
+    }
 
     # Merge with provided user_data if available
     if user_data and isinstance(user_data, dict):
@@ -32,27 +36,53 @@ def init_context(text, user_data=None):
                         context["age"] = entity.get("Text")
                     elif entity.get("Type") == "GENDER":
                         context["sex"] = entity.get("Text")
-    
-    # Generate questions for missing data
-    missing_questions = []
-    if not context.get("name"):
-        missing_questions.append("¿Cuál es tu nombre?")
-    if not context.get("sex"):
-        missing_questions.append("¿Cuál es tu sexo?")
-    if not context.get("age"):
-        missing_questions.append("¿Cuál es tu edad?")
-    if not context.get("location") and not context.get("occupation"):
-        missing_questions.append("¿Dónde te encuentras o cuál es tu ocupación?")
-    if not context.get("lifestyle"):
-        missing_questions.append("¿Cómo describirías tu estilo de vida?")
-    if not context.get("hobbies"):
-        missing_questions.append("¿Cuáles son tus hobbies?")
-    
-    # Save context to session
-    session["context"] = context
-    
+
+    if text and not context.get("chief_complaint"):
+        context["chief_complaint"] = text.strip()
+
+    # Prioridad clínica de preguntas (menor número = más prioridad)
+    missing_question_meta = []
+
+    def add_question(field, question, priority):
+        value = context.get(field)
+        if value in (None, "", [], {}):
+            missing_question_meta.append(
+                {
+                    "field": field,
+                    "question": question,
+                    "priority": priority,
+                }
+            )
+
+    # 1) Síntoma principal / evolución
+    add_question("symptom_duration", "¿Desde cuándo tienes estos síntomas?", 1)
+    # 2) Intensidad
+    add_question("pain_level_reported", "En una escala del 1 al 10, ¿qué tan intenso es el dolor ahora?", 2)
+    # 3) Red flags
+    add_question("red_flags_checked", "¿Has tenido dificultad para respirar, dolor de pecho, desmayo o fiebre muy alta?", 3)
+    # 4) Medicación / alergias / antecedentes
+    add_question("current_medications", "¿Estás tomando algún medicamento actualmente?", 4)
+    add_question("known_allergies", "¿Tienes alergias a medicamentos o alimentos?", 4)
+    add_question("medical_history_known", "¿Tienes algún antecedente médico importante?", 4)
+    # 5) Demográficos secundarios
+    add_question("name", "¿Cuál es tu nombre?", 5)
+    add_question("sex", "¿Cuál es tu sexo?", 5)
+    add_question("age", "¿Cuál es tu edad?", 5)
+    if (context.get("location") in (None, "")) and (context.get("occupation") in (None, "")):
+        missing_question_meta.append(
+            {
+                "field": "location_or_occupation",
+                "question": "¿Dónde te encuentras o cuál es tu ocupación?",
+                "priority": 5,
+            }
+        )
+
+    missing_question_meta.sort(key=lambda x: x["priority"])
+    missing_questions = [item["question"] for item in missing_question_meta]
+
     return {
-        "context": context, 
+        "context": context,
         "missing_questions": missing_questions,
+        "missing_question_meta": missing_question_meta,
         "entities": entities
     }

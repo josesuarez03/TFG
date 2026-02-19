@@ -1,0 +1,102 @@
+{
+  "messages": {
+    "base": "Tus síntomas podrían indicar una situación urgente. Busca atención médica inmediata o llama al 911 ahora.",
+    "psychological": "Si existe riesgo de autolesión, no te quedes solo/a. Llama al 911 ahora. También puedes contactar 988 (Lifeline) para apoyo en crisis."
+  },
+  "global_red_flags": [
+    {
+      "rule_id": "global_chest_pain",
+      "keyword": "dolor de pecho"
+    },
+    {
+      "rule_id": "global_breathing_distress",
+      "keyword": "dificultad para respirar"
+    },
+    {
+      "rule_id": "global_loss_of_consciousness",
+      "keyword": "pérdida de consciencia"
+    },
+    {
+      "rule_id": "global_seizure",
+      "keyword": "convulsión"
+    },
+    {
+      "rule_id": "global_severe_confusion",
+      "keyword": "confusión severa"
+    }
+  ],
+  "psychological_crisis_flags": [
+    {
+      "rule_id": "psych_suicidal_ideation",
+      "keyword": "quiero quitarme la vida"
+    },
+    {
+      "rule_id": "psych_self_harm_plan",
+      "keyword": "tengo un plan para suicidarme"
+    },
+    {
+      "rule_id": "psych_self_harm_intent",
+      "keyword": "me quiero hacer daño"
+    },
+    {
+      "rule_id": "psych_imminent_risk",
+      "keyword": "no quiero vivir"
+    }
+  ],
+  "case_red_flags": {
+    "headache_case": [
+      {
+        "rule_id": "headache_sudden_worst",
+        "keyword": "peor dolor de cabeza de mi vida"
+      },
+      {
+        "rule_id": "headache_neurological_deficit",
+        "keyword": "debilidad en un lado"
+      },
+      {
+        "rule_id": "headache_neck_stiffness_fever",
+        "keyword": "rigidez de cuello"
+      },
+      {
+        "rule_id": "headache_head_trauma",
+        "keyword": "golpe en la cabeza"
+      },
+      {
+        "rule_id": "headache_persistent_vomiting",
+        "keyword": "vómitos persistentes"
+      }
+    ],
+    "anxiety_case": [
+      {
+        "rule_id": "anxiety_psychosis",
+        "keyword": "escucho voces"
+      },
+      {
+        "rule_id": "anxiety_severe_agitation",
+        "keyword": "agitación extrema"
+      },
+      {
+        "rule_id": "anxiety_derealization",
+        "keyword": "desconectado de la realidad"
+      }
+    ],
+    "alcohol_case": [
+      {
+        "rule_id": "alcohol_withdrawal_seizure",
+        "keyword": "convulsión"
+      },
+      {
+        "rule_id": "alcohol_hallucinations",
+        "keyword": "alucinaciones"
+      },
+      {
+        "rule_id": "alcohol_delirium_confusion",
+        "keyword": "confusión marcada"
+      },
+      {
+        "rule_id": "alcohol_severe_tremor",
+        "keyword": "temblor severo"
+      }
+    ]
+  }
+}
