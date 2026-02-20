@@ -32,6 +32,25 @@ class ExpertSystemTests(unittest.TestCase):
         self.assertEqual(result.action, "fallback_ai")
         self.assertIn(result.fallback_reason, {"no_case_match", "low_confidence", "case_conflict"})
 
+    def test_conversation_state_progresses_between_turns(self):
+        first = self.orchestrator.evaluate(user_message="Tengo dolor de cabeza desde ayer.")
+        self.assertEqual(first.action, "ask")
+        self.assertEqual(first.case_id, "headache_case")
+        first_node = first.state.active_node_id
+
+        second = self.orchestrator.evaluate(
+            user_message="Fue de repente.",
+            prior_expert_state={
+                "active_case_id": first.state.active_case_id,
+                "active_node_id": first.state.active_node_id,
+                "collected_fields": first.state.collected_fields,
+                "pain_scale": first.pain_scale,
+            },
+        )
+        self.assertEqual(second.case_id, "headache_case")
+        self.assertEqual(second.action, "ask")
+        self.assertNotEqual(first_node, second.state.active_node_id)
+
 
 if __name__ == "__main__":
     unittest.main()

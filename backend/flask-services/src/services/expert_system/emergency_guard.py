@@ -8,6 +8,11 @@ def detect_emergency(
 ) -> Tuple[bool, List[str], bool]:
     matched_rules: List[str] = []
     is_psychological = False
+    psychological_case_ids = {
+        str(case).strip()
+        for case in emergency_rules.get("psychological_case_ids", [])
+        if str(case).strip()
+    }
 
     global_rules = emergency_rules.get("global_red_flags", [])
     for item in global_rules:
@@ -16,12 +21,14 @@ def detect_emergency(
             matched_rules.append(str(item.get("rule_id", "global_emergency_rule")))
 
     if case_id:
+        if case_id in psychological_case_ids:
+            is_psychological = True
         case_rules = emergency_rules.get("case_red_flags", {}).get(case_id, [])
         for item in case_rules:
             keyword = str(item.get("keyword", "")).lower()
             if keyword and keyword in user_message_lower:
                 matched_rules.append(str(item.get("rule_id", f"{case_id}_emergency_rule")))
-                if case_id == "anxiety_case":
+                if bool(item.get("psychological", False)):
                     is_psychological = True
 
     psych_rules = emergency_rules.get("psychological_crisis_flags", [])

@@ -141,6 +141,9 @@ def process_message_logic(user_id, user_message, user_data, conversation_id, jwt
                     "last_rule_ids": expert_decision.state.last_rule_ids,
                     "fallback_reason": expert_decision.state.fallback_reason,
                     "emergency_triggered": expert_decision.state.emergency_triggered,
+                    "collected_fields": expert_decision.state.collected_fields,
+                    "pain_scale": expert_decision.pain_scale,
+                    "triage_level": expert_decision.state.triage_level,
                 },
             },
         }

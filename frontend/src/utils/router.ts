@@ -11,18 +11,17 @@ export function useAppRouter() {
   const navigate = {
     // Public routes
     toLogin: (from?: string) => {
-      // Podemos usar la ruta raíz para login o la ruta específica, aquí preferimos la raíz
-      const path = ROUTES.PUBLIC.ROOT_LOGIN;
+      const path = ROUTES.PUBLIC.LOGIN;
       if (from) {
         router.push(`${path}?from=${encodeURIComponent(from)}`);
       } else {
         router.push(path);
       }
     },
-    toHome: () => router.push(ROUTES.PUBLIC.ROOT_LOGIN),  // Ahora la home es el login
+    toHome: () => router.push(ROUTES.PUBLIC.ROOT_LOGIN),
     toRegister: () => router.push(ROUTES.PUBLIC.REGISTER),
     toProfileType: () => router.push(ROUTES.PUBLIC.PROFILE_TYPE),
-    toCompleteProfile: () => router.push(ROUTES.PUBLIC.COMPLETE_PROFILE),
+    toCompleteProfile: () => router.push(ROUTES.PUBLIC.PROFILE_COMPLETE),
     toRecoverPassword: (fromLogin = true) => {
       const path = ROUTES.PUBLIC.RECOVER_PASSWORD;
       if (fromLogin) {
@@ -36,7 +35,7 @@ export function useAppRouter() {
     // Protected routes
     toDashboard: () => router.push(ROUTES.PROTECTED.DASHBOARD),
     toProfile: () => router.push(ROUTES.PROTECTED.PROFILE),
-    toProfileComplete: () => router.push(ROUTES.PROTECTED.PROFILE_COMPLETE),
+    toProfileComplete: () => router.push(ROUTES.PUBLIC.PROFILE_COMPLETE),
     toEditProfile: () => router.push(ROUTES.PROTECTED.PROFILE_EDIT),
     toChangePassword: () => router.push(ROUTES.PROTECTED.PROFILE_CHANGE_PASSWORD),
     toDeleteAccount: () => router.push(ROUTES.PROTECTED.PROFILE_DELETE_ACCOUNT),

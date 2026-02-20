@@ -30,6 +30,7 @@ class ExpertOrchestrator:
         previous_case_id = prior_state.get("active_case_id")
         previous_fields = prior_state.get("collected_fields", {})
         previous_pain = prior_state.get("pain_scale", 0)
+        previous_node_id = prior_state.get("active_node_id")
 
         case_id, intent_score, second_score = detect_best_case(
             user_message=user_message,
@@ -102,10 +103,17 @@ class ExpertOrchestrator:
             )
 
         case_def = self.cases[case_id]
+        expected_field = None
+        if previous_node_id:
+            for node in case_def.get("tree", []):
+                if node.get("id") == previous_node_id:
+                    expected_field = node.get("field")
+                    break
         collected_fields = extract_case_fields(
-            case_id=case_id,
+            case_def=case_def,
             user_message=user_message,
             previous_fields=previous_fields,
+            expected_field=expected_field,
         )
         pain_scale = infer_pain_level(user_message, previous_value=previous_pain)
         triage_level = classify_triage_level(case_id, pain_scale, user_message, self.triage_policy)
@@ -118,7 +126,8 @@ class ExpertOrchestrator:
         )
 
         min_intent_for_tree = float(self.triage_policy.get("min_intent_for_tree", 0.25))
-        should_fallback = (not confidence_ok) and (float(intent_score) < min_intent_for_tree)
+        continuing_same_case = bool(previous_case_id and previous_case_id == case_id)
+        should_fallback = (not confidence_ok) and (float(intent_score) < min_intent_for_tree) and (not continuing_same_case)
         if should_fallback:
             state = ExpertState(
                 active_case_id=case_id,

@@ -1,5 +1,5 @@
 import re
-from typing import Any, Dict, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 
 def _normalize_text(text: str) -> str:
@@ -57,46 +57,121 @@ def infer_pain_level(user_message: str, previous_value: Optional[int] = None) ->
     return previous_value if isinstance(previous_value, int) else 0
 
 
-def extract_case_fields(case_id: str, user_message: str, previous_fields: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+def _default_keywords_for_field(field_name: str) -> List[str]:
+    return {
+        "duration": ["día", "seman", "mes", "hora", "desde", "hace", "ayer", "anoche", "hoy"],
+        "associated_symptoms": ["náusea", "vomit", "luz", "ruido", "visión", "mareo"],
+        "neurologic_red_flags": ["rigidez de cuello", "debilidad", "hormigueo", "desmayo"],
+        "triggers": ["estrés", "trabajo", "examen", "discusión", "gatilla", "desencaden"],
+        "sleep_impact": ["duermo", "insomnio", "sueño"],
+        "functional_impact": ["no puedo", "afecta", "rendimiento", "trabajar", "estudiar", "familia", "social", "funcion"],
+        "physical_symptoms": ["palpit", "tembl", "sudor", "opresión", "respirar"],
+        "consumption_pattern": ["tomo", "beb", "alcohol", "cerveza", "licor", "copas"],
+        "last_intake": ["última", "ultima", "anoche", "hoy", "ayer", "hace"],
+        "withdrawal_symptoms": ["tembl", "sudor", "náuse", "vomit", "ansiedad", "insomnio", "alucin"],
+    }.get(field_name, [])
+
+
+def _extract_with_rule(
+    *,
+    field_name: str,
+    rule: Dict[str, Any],
+    user_message: str,
+    user_message_lower: str,
+) -> Any:
+    extractor_type = str(rule.get("type", "")).strip().lower()
+
+    if extractor_type == "pain_scale":
+        pain = infer_pain_level(user_message)
+        return pain if pain > 0 else None
+
+    if extractor_type == "categorical_keywords":
+        categories = rule.get("categories", {})
+        if not isinstance(categories, dict):
+            return None
+        for category, keywords in categories.items():
+            if any(str(k).lower() in user_message_lower for k in (keywords or [])):
+                return str(category)
+        return None
+
+    if extractor_type == "regex":
+        patterns = rule.get("patterns", [])
+        for raw_pattern in patterns:
+            try:
+                match = re.search(str(raw_pattern), user_message, re.IGNORECASE)
+            except re.error:
+                continue
+            if not match:
+                continue
+            group_index = int(rule.get("group", 0))
+            value = match.group(group_index)
+            value_type = str(rule.get("value_type", "text")).lower()
+            if value_type == "int":
+                try:
+                    return int(value)
+                except (TypeError, ValueError):
+                    return None
+            return value.strip() if isinstance(value, str) else value
+        return None
+
+    keywords = [str(k).lower() for k in rule.get("keywords", []) if str(k).strip()]
+    if extractor_type in {"keyword_text", "text_if_keyword"}:
+        if any(keyword in user_message_lower for keyword in keywords):
+            return user_message.strip()
+        return None
+
+    if extractor_type == "always_text":
+        return user_message.strip()
+
+    default_keywords = _default_keywords_for_field(field_name)
+    if default_keywords and any(keyword in user_message_lower for keyword in default_keywords):
+        return user_message.strip()
+    if field_name == "onset":
+        if any(k in user_message_lower for k in ["de repente", "súbito", "suddenly", "repentino"]):
+            return "sudden"
+        if any(k in user_message_lower for k in ["gradual", "poco a poco"]):
+            return "gradual"
+    if field_name in {"pain_intensity", "pain_scale"}:
+        pain = infer_pain_level(user_message)
+        return pain if pain > 0 else None
+    return None
+
+
+def extract_case_fields(
+    *,
+    case_def: Dict[str, Any],
+    user_message: str,
+    previous_fields: Optional[Dict[str, Any]] = None,
+    expected_field: Optional[str] = None,
+) -> Dict[str, Any]:
     text = _normalize_text(user_message)
     fields = dict(previous_fields or {})
+    required_fields = [str(field) for field in case_def.get("required_fields", [])]
+    extractors = case_def.get("field_extractors", {})
+    if not isinstance(extractors, dict):
+        extractors = {}
 
-    if case_id == "headache_case":
-        if any(k in text for k in ["de repente", "súbito", "suddenly", "repentino"]):
-            fields["onset"] = "sudden"
-        elif any(k in text for k in ["gradual", "poco a poco"]):
-            fields["onset"] = "gradual"
-        if any(k in text for k in ["día", "seman", "mes", "hora", "desde ayer", "desde hace"]):
-            fields["duration"] = user_message.strip()
-        if any(k in text for k in ["náusea", "vomit", "luz", "ruido", "visión", "mareo"]):
-            fields["associated_symptoms"] = user_message.strip()
-        if any(k in text for k in ["rigidez de cuello", "debilidad", "hormigueo", "desmayo"]):
-            fields["neurologic_red_flags"] = user_message.strip()
-        pain = infer_pain_level(user_message)
-        if pain > 0:
-            fields["pain_intensity"] = pain
+    for field_name in required_fields:
+        if fields.get(field_name) not in (None, "", [], {}):
+            continue
+        rule = extractors.get(field_name, {}) if isinstance(extractors.get(field_name, {}), dict) else {}
+        value = _extract_with_rule(
+            field_name=field_name,
+            rule=rule,
+            user_message=user_message,
+            user_message_lower=text,
+        )
+        if value not in (None, "", [], {}):
+            fields[field_name] = value
 
-    if case_id == "anxiety_case":
-        if any(k in text for k in ["desde", "día", "seman", "mes", "hace"]):
-            fields["duration"] = user_message.strip()
-        if any(k in text for k in ["estrés", "trabajo", "examen", "discusión", "gatilla", "desencaden"]):
-            fields["triggers"] = user_message.strip()
-        if any(k in text for k in ["duermo", "insomnio", "sueño"]):
-            fields["sleep_impact"] = user_message.strip()
-        if any(k in text for k in ["no puedo", "afecta", "rendimiento", "trabajar", "estudiar"]):
-            fields["functional_impact"] = user_message.strip()
-        if any(k in text for k in ["palpit", "tembl", "sudor", "opresión", "respirar"]):
-            fields["physical_symptoms"] = user_message.strip()
-
-    if case_id == "alcohol_case":
-        if any(k in text for k in ["tomo", "beb", "alcohol", "cerveza", "licor", "copas"]):
-            fields["consumption_pattern"] = user_message.strip()
-        if any(k in text for k in ["última", "ultima", "anoche", "hoy", "ayer", "hace"]):
-            fields["last_intake"] = user_message.strip()
-        if any(k in text for k in ["tembl", "sudor", "náuse", "vomit", "ansiedad", "insomnio", "alucin"]):
-            fields["withdrawal_symptoms"] = user_message.strip()
-        if any(k in text for k in ["trabajo", "familia", "problema", "social", "funcion"]):
-            fields["functional_impact"] = user_message.strip()
+    if expected_field and expected_field in required_fields and fields.get(expected_field) in (None, "", [], {}):
+        rule = extractors.get(expected_field, {}) if isinstance(extractors.get(expected_field, {}), dict) else {}
+        if str(rule.get("type", "")).strip().lower() == "pain_scale" or expected_field in {"pain_intensity", "pain_scale"}:
+            pain_value = infer_pain_level(user_message)
+            if pain_value > 0:
+                fields[expected_field] = pain_value
+        else:
+            fields[expected_field] = user_message.strip()
 
     return fields
 

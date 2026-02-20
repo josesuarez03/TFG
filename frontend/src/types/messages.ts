@@ -1,6 +1,7 @@
 export interface Message {
-    id: string;
-    content: string;
-    sender: 'user' | 'bot';
-    timestamp: Date;
-  }
+  id: string;
+  content: string;
+  sender: "user" | "bot" | "system";
+  status?: "pending" | "sent" | "error";
+  timestamp: string;
+}

@@ -43,6 +43,9 @@
       "keyword": "no quiero vivir"
     }
   ],
+  "psychological_case_ids": [
+    "anxiety_case"
+  ],
   "case_red_flags": {
     "headache_case": [
       {

@@ -24,6 +24,9 @@ psychological_crisis_flags:
   - rule_id: psych_imminent_risk
     keyword: no quiero vivir
 
+psychological_case_ids:
+  - anxiety_case
+
 case_red_flags:
   headache_case:
     - rule_id: headache_sudden_worst
