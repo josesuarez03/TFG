@@ -1,7 +1,9 @@
 import json
 import logging
+import os
 import threading
 import time
+import uuid
 from collections import deque
 from datetime import datetime
 from typing import Any, Deque, Dict, List, Optional, Set, Tuple
@@ -16,6 +18,9 @@ _RETRY_BACKOFF_SECONDS: Tuple[int, int, int] = (0, 2, 5)
 _REGISTRY_LOCK = threading.Lock()
 _CONVERSATION_QUEUES: Dict[str, Deque[Dict[str, Any]]] = {}
 _ACTIVE_WORKERS: Set[str] = set()
+_INACTIVITY_LOCK = threading.Lock()
+_INACTIVITY_TIMERS: Dict[str, threading.Timer] = {}
+_DEFAULT_INACTIVITY_SECONDS = max(1, int(os.getenv("ETL_INACTIVITY_SECONDS", "900")))
 
 
 def _utc_now_iso() -> str:
@@ -275,3 +280,58 @@ def enqueue_etl_run(
             daemon=True,
             name=worker_name,
         ).start()
+
+
+def clear_inactivity_timer(user_id: str, conversation_id: str) -> None:
+    key = _conversation_key(user_id, conversation_id)
+    with _INACTIVITY_LOCK:
+        timer = _INACTIVITY_TIMERS.pop(key, None)
+    if timer:
+        timer.cancel()
+
+
+def schedule_inactivity_etl(
+    user_id: str,
+    conversation_id: str,
+    jwt_token: Optional[str] = None,
+    inactivity_seconds: Optional[int] = None,
+) -> None:
+    timeout_seconds = int(inactivity_seconds) if inactivity_seconds is not None else _DEFAULT_INACTIVITY_SECONDS
+    timeout_seconds = max(1, timeout_seconds)
+    key = _conversation_key(user_id, conversation_id)
+
+    def _on_timeout() -> None:
+        with _INACTIVITY_LOCK:
+            current = _INACTIVITY_TIMERS.get(key)
+            if current is not timer:
+                return
+            _INACTIVITY_TIMERS.pop(key, None)
+        run_id = str(uuid.uuid4())
+        reasons = ["inactivity_timeout"]
+        try:
+            enqueue_etl_run(
+                user_id=user_id,
+                conversation_id=conversation_id,
+                jwt_token=jwt_token,
+                reasons=reasons,
+                run_id=run_id,
+            )
+        except Exception as e:
+            _log_etl_event(
+                "etl_failed",
+                user_id=user_id,
+                conversation_id=conversation_id,
+                run_id=run_id,
+                reasons=reasons,
+                attempt=0,
+                error=str(e),
+            )
+
+    timer = threading.Timer(timeout_seconds, _on_timeout)
+    timer.daemon = True
+    with _INACTIVITY_LOCK:
+        previous = _INACTIVITY_TIMERS.get(key)
+        if previous:
+            previous.cancel()
+        _INACTIVITY_TIMERS[key] = timer
+    timer.start()

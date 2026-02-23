@@ -5,10 +5,12 @@ from flask_socketio import emit, join_room, leave_room
 from . import socketio
 from routes.utils import process_message_logic, conversational_dataset_manager
 from services.auth.auth import get_user_id_from_token 
+from services.process_data.etl_runner import clear_inactivity_timer, enqueue_etl_run
 
 # Configurar logger
 logger = logging.getLogger(__name__)
 AUTHENTICATED_USERS_BY_SID = {}
+ACTIVE_CONVERSATION_BY_SID = {}
 
 @socketio.on('connect')
 def handle_connect():
@@ -44,6 +46,34 @@ def handle_connect():
 @socketio.on('disconnect')
 def handle_disconnect(reason=None):
     sid = request.sid
+    user_id = AUTHENTICATED_USERS_BY_SID.get(sid)
+    conversation_id = ACTIVE_CONVERSATION_BY_SID.pop(sid, None)
+    if user_id and conversation_id:
+        run_id = str(uuid.uuid4())
+        try:
+            clear_inactivity_timer(user_id, conversation_id)
+            enqueue_etl_run(
+                user_id=user_id,
+                conversation_id=conversation_id,
+                jwt_token=None,
+                reasons=["websocket_disconnect"],
+                run_id=run_id,
+            )
+            logger.info(
+                "ETL encolada por disconnect sid=%s user=%s conversation=%s run_id=%s",
+                sid,
+                user_id,
+                conversation_id,
+                run_id,
+            )
+        except Exception as e:
+            logger.warning(
+                "No se pudo encolar ETL por disconnect sid=%s user=%s conversation=%s: %s",
+                sid,
+                user_id,
+                conversation_id,
+                str(e),
+            )
     AUTHENTICATED_USERS_BY_SID.pop(sid, None)
     logger.info(f"Cliente desconectado: {sid}. Razón: {reason}")
 
@@ -109,6 +139,9 @@ def handle_chat_message(data):
         if status_code != 200:
             emit('error', result, room=sid)
         else:
+            result_conversation_id = result.get("conversation_id")
+            if result_conversation_id:
+                ACTIVE_CONVERSATION_BY_SID[sid] = result_conversation_id
             emit('chat_response', result, room=sid)
                       
     except Exception as e:
@@ -127,6 +160,7 @@ def on_join_conversation(data):
     conversation_id_encrypted = data.get('conversation_id')
     if conversation_id_encrypted:
         join_room(conversation_id_encrypted)
+        ACTIVE_CONVERSATION_BY_SID[sid] = conversation_id_encrypted
         emit('room_joined', {'room': conversation_id_encrypted, 'status': 'joined'}, room=sid)
         logger.info(f"Cliente {sid} se unió a la conversación {conversation_id_encrypted}")
     else:
@@ -144,8 +178,48 @@ def on_leave_conversation(data):
 
     conversation_id_encrypted = data.get('conversation_id')
     if conversation_id_encrypted:
+        token_from_payload = data.get("token")
+        user_id = AUTHENTICATED_USERS_BY_SID.get(sid)
+        if not user_id and token_from_payload:
+            user_id = get_user_id_from_token(token_from_payload)
+        if not user_id:
+            user_id = data.get("user_id")
+
         leave_room(conversation_id_encrypted)
-        emit('room_left', {'room': conversation_id_encrypted, 'status': 'left'}, room=sid)
+        ACTIVE_CONVERSATION_BY_SID.pop(sid, None)
+        etl_enqueued = False
+        etl_run_id = ""
+        if user_id:
+            etl_run_id = str(uuid.uuid4())
+            try:
+                clear_inactivity_timer(user_id, conversation_id_encrypted)
+                enqueue_etl_run(
+                    user_id=user_id,
+                    conversation_id=conversation_id_encrypted,
+                    jwt_token=token_from_payload,
+                    reasons=["websocket_room_closed"],
+                    run_id=etl_run_id,
+                )
+                etl_enqueued = True
+            except Exception as e:
+                logger.warning(
+                    "No se pudo encolar ETL por cierre de room sid=%s user=%s conversation=%s: %s",
+                    sid,
+                    user_id,
+                    conversation_id_encrypted,
+                    str(e),
+                )
+
+        emit(
+            'room_left',
+            {
+                'room': conversation_id_encrypted,
+                'status': 'left',
+                'etl_queued': etl_enqueued,
+                'etl_run_id': etl_run_id,
+            },
+            room=sid,
+        )
         logger.info(f"Cliente {sid} abandonó la conversación {conversation_id_encrypted}")
     else:
         logger.warning(f"No se proporcionó conversation_id para leave_conversation por SID {sid}")

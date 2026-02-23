@@ -11,7 +11,7 @@ from services.chatbot.pain_utils import extract_pain_scale
 from services.api.send_api import get_patient_global_context
 from services.expert_system.orchestrator import ExpertOrchestrator
 from services.expert_system.fallback_adapter import FallbackModelAdapter
-from services.process_data.etl_runner import enqueue_etl_run
+from services.process_data.etl_runner import clear_inactivity_timer, enqueue_etl_run, schedule_inactivity_etl
 
 # Configurar logger
 logger = logging.getLogger(__name__)
@@ -79,6 +79,15 @@ EXPLICIT_CLOSE_PHRASES = (
     "fin",
     "cerrar chat",
     "hasta luego",
+)
+BOT_CLOSE_PHRASES = (
+    "espero haberte ayudado",
+    "si necesitas algo mas",
+    "si necesitas algo más",
+    "no dudes en volver",
+    "consulta finalizada",
+    "puedes volver cuando quieras",
+    "quedo atento",
 )
 
 
@@ -250,11 +259,54 @@ def _normalize_user_text(text: str) -> str:
     return re.sub(r"\s+", " ", no_punct).strip()
 
 
+def _is_expert_advice_close(bot_response: str, triage_level: str, expert_decision: Any = None) -> bool:
+    if expert_decision is None:
+        return False
+
+    action = str(getattr(expert_decision, "action", "") or "").strip().lower()
+    if action == "advise":
+        return True
+
+    case_id = str(getattr(expert_decision, "case_id", "") or "").strip()
+    if not case_id:
+        return False
+
+    case_def = expert_orchestrator.cases.get(case_id, {})
+    if not isinstance(case_def, dict):
+        return False
+    advice_map = case_def.get("advice", {})
+    if not isinstance(advice_map, dict):
+        return False
+
+    bot_norm = _normalize_user_text(bot_response)
+    if not bot_norm:
+        return False
+
+    triage_norm = _normalize_triage(triage_level)
+    candidate_texts: List[str] = []
+    primary_advice = advice_map.get(triage_norm)
+    if isinstance(primary_advice, str) and primary_advice.strip():
+        candidate_texts.append(primary_advice)
+    for value in advice_map.values():
+        if isinstance(value, str) and value.strip():
+            candidate_texts.append(value)
+
+    for candidate in candidate_texts:
+        candidate_norm = _normalize_user_text(candidate)
+        if not candidate_norm:
+            continue
+        if bot_norm == candidate_norm or bot_norm.startswith(candidate_norm) or candidate_norm in bot_norm:
+            return True
+    return False
+
+
 def _detect_finalization(
     user_message: str,
+    bot_response: str,
     conversation_state: Dict[str, Any],
     triage_level: str,
     controller_mode: str,
+    expert_decision: Any = None,
 ) -> Tuple[bool, List[str]]:
     reasons: List[str] = []
 
@@ -269,6 +321,13 @@ def _detect_finalization(
     if normalized_message:
         if any(phrase in normalized_message for phrase in EXPLICIT_CLOSE_PHRASES):
             reasons.append("explicit_close_phrase")
+
+    normalized_bot = _normalize_user_text(bot_response)
+    if normalized_bot:
+        if any(phrase in normalized_bot for phrase in BOT_CLOSE_PHRASES):
+            reasons.append("bot_close_phrase")
+    if _is_expert_advice_close(bot_response, triage_level, expert_decision=expert_decision):
+        reasons.append("expert_advice_close")
 
     reasons = list(dict.fromkeys(reasons))
     return len(reasons) > 0, reasons
@@ -546,9 +605,11 @@ def process_message_logic(user_id, user_message, user_data, conversation_id, jwt
     }
     etl_triggered, etl_reasons = _detect_finalization(
         user_message=user_message,
+        bot_response=response_text,
         conversation_state=conversation_state,
         triage_level=triage_final,
         controller_mode=controller_mode,
+        expert_decision=expert_decision,
     )
     etl_payload = {
         "triggered": False,
@@ -607,6 +668,7 @@ def process_message_logic(user_id, user_message, user_data, conversation_id, jwt
     if etl_triggered and conversation_id:
         run_id = str(uuid.uuid4())
         try:
+            clear_inactivity_timer(user_id, conversation_id)
             enqueue_etl_run(
                 user_id=user_id,
                 conversation_id=conversation_id,
@@ -623,6 +685,16 @@ def process_message_logic(user_id, user_message, user_data, conversation_id, jwt
         except Exception as e:
             logger.error(
                 "No se pudo encolar ETL para conversación %s del usuario %s: %s",
+                conversation_id,
+                user_id,
+                str(e),
+            )
+    elif conversation_id:
+        try:
+            schedule_inactivity_etl(user_id=user_id, conversation_id=conversation_id, jwt_token=jwt_token)
+        except Exception as e:
+            logger.warning(
+                "No se pudo programar timeout ETL por inactividad para conversación %s usuario %s: %s",
                 conversation_id,
                 user_id,
                 str(e),

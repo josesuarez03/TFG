@@ -59,6 +59,22 @@ class ETLRunnerRetryTests(unittest.TestCase):
         self.assertEqual(mock_update_state.call_args_list[-1].args[2].get("attempts"), 3)
         self.assertIn("network", mock_update_state.call_args_list[-1].args[2].get("last_error", ""))
 
+    @patch("services.process_data.etl_runner.threading.Timer")
+    def test_schedule_inactivity_replaces_previous_timer(self, mock_timer_cls):
+        first_timer = unittest.mock.Mock()
+        second_timer = unittest.mock.Mock()
+        mock_timer_cls.side_effect = [first_timer, second_timer]
+        key = "user-1:conv-1"
+
+        etl_runner.schedule_inactivity_etl("user-1", "conv-1", inactivity_seconds=5)
+        etl_runner.schedule_inactivity_etl("user-1", "conv-1", inactivity_seconds=5)
+
+        self.assertEqual(mock_timer_cls.call_count, 2)
+        first_timer.cancel.assert_called_once()
+        second_timer.start.assert_called_once()
+        etl_runner.clear_inactivity_timer("user-1", "conv-1")
+        self.assertNotIn(key, etl_runner._INACTIVITY_TIMERS)
+
 
 if __name__ == "__main__":
     unittest.main()
