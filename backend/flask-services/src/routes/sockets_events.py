@@ -42,12 +42,10 @@ def handle_connect():
 
 
 @socketio.on('disconnect')
-def handle_disconnect():
+def handle_disconnect(reason=None):
     sid = request.sid
     AUTHENTICATED_USERS_BY_SID.pop(sid, None)
-    # 'reason' puede no estar siempre disponible o ser fiable, depende del cliente y desconexión.
-    # Flask-SocketIO no lo pasa directamente como argumento a la función de disconnect.
-    logger.info(f"Cliente desconectado: {sid}")
+    logger.info(f"Cliente desconectado: {sid}. Razón: {reason}")
 
 
 @socketio.on('chat_message')
@@ -61,28 +59,34 @@ def handle_chat_message(data):
 
     try:
         user_id = None
+        auth_source = None
         token_from_payload = data.get('token')
 
         if token_from_payload:
             logger.debug(f"Intentando obtener user_id del token en payload de chat_message para SID {sid}.")
             user_id = get_user_id_from_token(token_from_payload)
+            if user_id:
+                auth_source = "token_payload"
 
         if not user_id:
             user_id = AUTHENTICATED_USERS_BY_SID.get(sid)
             if user_id:
+                auth_source = "socket_connect_auth"
                 logger.info(f"WebSocket (SID {sid}): Usando user_id autenticado en conexión: '{user_id}'.")
 
         if not user_id:
             user_id_from_data = data.get('user_id')
             if user_id_from_data:
                 user_id = user_id_from_data
-                logger.warning(f"WebSocket (SID {sid}): No se encontró token válido o token inválido. Usando user_id '{user_id}' proporcionado en el mensaje.")
+                auth_source = "payload_user_id_fallback"
+                logger.info(f"WebSocket (SID {sid}): Token ausente/invalidado en payload. Usando user_id '{user_id}' proporcionado en el mensaje.")
             else:
                 # Considera si se debe permitir mensajes sin user_id o token
                 user_id = f"anonymous_{sid}" 
+                auth_source = "anonymous_sid_fallback"
                 logger.warning(f"WebSocket (SID {sid}): Ni token válido ni user_id en payload. Usando user_id temporal '{user_id}'.")
-        else:
-            logger.info(f"Usuario {user_id} identificado desde token para chat_message de SID {sid}.")
+        
+        logger.info(f"Usuario {user_id} identificado para chat_message de SID {sid} (source={auth_source}).")
         
         user_message = data.get('message', '')
         if not user_message.strip():
@@ -174,7 +178,7 @@ def handle_sync_request(data):
             user_id_from_data = data.get('user_id')
             if user_id_from_data:
                 user_id = user_id_from_data
-                logger.warning(f"WebSocket (SID {sid}): No se encontró token válido o token inválido para sync. Usando user_id '{user_id}' proporcionado en el mensaje.")
+                logger.info(f"WebSocket (SID {sid}): Token ausente/invalidado en sync payload. Usando user_id '{user_id}' proporcionado en el mensaje.")
         
         if not user_id: # Aún sin user_id después de los intentos
             logger.warning(f"Autenticación requerida para sync_request fallida para SID {sid}. Ni token válido ni user_id proporcionado.")

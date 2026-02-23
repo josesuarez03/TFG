@@ -1,17 +1,54 @@
 import re
+import unicodedata
 from typing import Any, Dict, List, Optional, Tuple
+
+from services.chatbot.pain_utils import extract_pain_scale
 
 
 def _normalize_text(text: str) -> str:
-    return (text or "").strip().lower()
+    lowered = (text or "").strip().lower()
+    no_accents = "".join(
+        ch for ch in unicodedata.normalize("NFKD", lowered) if unicodedata.category(ch) != "Mn"
+    )
+    cleaned = re.sub(r"[^a-z0-9\s]", " ", no_accents)
+    collapsed = re.sub(r"\s+", " ", cleaned).strip()
+
+    # Canonicalize common colloquial forms to improve case detection.
+    aliases = {
+        "me duele la cabeza": "dolor de cabeza",
+        "me duele cabeza": "dolor de cabeza",
+        "dolor cabeza": "dolor de cabeza",
+    }
+    for src, target in aliases.items():
+        collapsed = collapsed.replace(src, target)
+    return collapsed
 
 
 def _intent_score_for_case(user_message_lower: str, case_def: Dict[str, Any]) -> float:
-    keywords = [str(k).lower() for k in case_def.get("intent_keywords", []) if str(k).strip()]
+    keywords = [_normalize_text(str(k)) for k in case_def.get("intent_keywords", []) if str(k).strip()]
     if not keywords:
         return 0.0
-    matches = sum(1 for kw in keywords if kw in user_message_lower)
-    return round(matches / len(keywords), 3)
+
+    msg_tokens = set(user_message_lower.split())
+    if not msg_tokens:
+        return 0.0
+
+    total_score = 0.0
+    for keyword in keywords:
+        if not keyword:
+            continue
+        if keyword in user_message_lower:
+            total_score += 1.0
+            continue
+
+        key_tokens = set(keyword.split())
+        if not key_tokens:
+            continue
+        overlap = len(msg_tokens & key_tokens) / len(key_tokens)
+        if overlap >= 0.6:
+            total_score += overlap
+
+    return round(total_score / len(keywords), 3)
 
 
 def detect_best_case(user_message: str, cases: Dict[str, Dict[str, Any]], active_case_id: Optional[str] = None) -> Tuple[Optional[str], float, float]:
@@ -35,40 +72,24 @@ def detect_best_case(user_message: str, cases: Dict[str, Dict[str, Any]], active
 
 
 def infer_pain_level(user_message: str, previous_value: Optional[int] = None) -> int:
-    text = _normalize_text(user_message)
-    m = re.search(r"(?:dolor|intensidad|escala)[^\d]{0,10}(\d{1,2})", text)
-    if m:
-        value = int(m.group(1))
-        if 0 <= value <= 10:
-            return value
-
-    keyword_scores = {
-        "insoportable": 9,
-        "muy fuerte": 8,
-        "intenso": 8,
-        "fuerte": 6,
-        "moderado": 5,
-        "leve": 2,
-        "suave": 2,
-    }
-    for keyword, score in keyword_scores.items():
-        if keyword in text:
-            return score
+    pain_value = extract_pain_scale(user_message)
+    if pain_value is not None:
+        return pain_value
     return previous_value if isinstance(previous_value, int) else 0
 
 
 def _default_keywords_for_field(field_name: str) -> List[str]:
     return {
-        "duration": ["día", "seman", "mes", "hora", "desde", "hace", "ayer", "anoche", "hoy"],
-        "associated_symptoms": ["náusea", "vomit", "luz", "ruido", "visión", "mareo"],
+        "duration": ["dia", "seman", "mes", "hora", "desde", "hace", "ayer", "anoche", "hoy"],
+        "associated_symptoms": ["nausea", "vomit", "luz", "ruido", "vision", "mareo"],
         "neurologic_red_flags": ["rigidez de cuello", "debilidad", "hormigueo", "desmayo"],
-        "triggers": ["estrés", "trabajo", "examen", "discusión", "gatilla", "desencaden"],
-        "sleep_impact": ["duermo", "insomnio", "sueño"],
+        "triggers": ["estres", "trabajo", "examen", "discusion", "gatilla", "desencaden"],
+        "sleep_impact": ["duermo", "insomnio", "sueno"],
         "functional_impact": ["no puedo", "afecta", "rendimiento", "trabajar", "estudiar", "familia", "social", "funcion"],
-        "physical_symptoms": ["palpit", "tembl", "sudor", "opresión", "respirar"],
+        "physical_symptoms": ["palpit", "tembl", "sudor", "opresion", "respirar"],
         "consumption_pattern": ["tomo", "beb", "alcohol", "cerveza", "licor", "copas"],
-        "last_intake": ["última", "ultima", "anoche", "hoy", "ayer", "hace"],
-        "withdrawal_symptoms": ["tembl", "sudor", "náuse", "vomit", "ansiedad", "insomnio", "alucin"],
+        "last_intake": ["ultima", "anoche", "hoy", "ayer", "hace"],
+        "withdrawal_symptoms": ["tembl", "sudor", "nause", "vomit", "ansiedad", "insomnio", "alucin"],
     }.get(field_name, [])
 
 
@@ -127,7 +148,7 @@ def _extract_with_rule(
     if default_keywords and any(keyword in user_message_lower for keyword in default_keywords):
         return user_message.strip()
     if field_name == "onset":
-        if any(k in user_message_lower for k in ["de repente", "súbito", "suddenly", "repentino"]):
+        if any(k in user_message_lower for k in ["de repente", "subito", "suddenly", "repentino"]):
             return "sudden"
         if any(k in user_message_lower for k in ["gradual", "poco a poco"]):
             return "gradual"

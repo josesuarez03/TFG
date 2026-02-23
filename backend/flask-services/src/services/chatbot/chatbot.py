@@ -5,6 +5,7 @@ from services.chatbot.input_validate import analyze_message, generate_response
 from services.chatbot.triaje_classification import TriageClassification
 from services.chatbot.bedrock_claude import call_claude
 from services.chatbot.conversation_context_service import ConversationContextService
+from services.chatbot.pain_utils import extract_pain_scale
 
 logging.basicConfig(level=logging.INFO)
 
@@ -217,28 +218,24 @@ class Chatbot:
         return symptoms
     
     def _extract_pain_level_from_context(self):
-        """Extract pain level from context or estimate from input"""
-        # Look for pain indicators in the input
-        pain_keywords = {
-            'severo': 8, 'intenso': 8, 'insoportable': 9, 'terrible': 8,
-            'moderado': 5, 'fuerte': 6, 'considerable': 5,
-            'leve': 2, 'ligero': 2, 'poco': 1, 'molesto': 3
-        }
-        
-        user_input_lower = self.user_input.lower()
-        for keyword, level in pain_keywords.items():
-            if keyword in user_input_lower:
-                return level
-        
-        # Look for numeric pain scale (1-10)
-        import re
-        pain_match = re.search(r'dolor.*?(\d+)', user_input_lower)
-        if pain_match:
-            pain_value = int(pain_match.group(1))
-            if 1 <= pain_value <= 10:
-                return pain_value
-        
-        # Default to mild pain level
+        """Extract pain from current message; keep previous value when no new evidence."""
+        explicit_pain = extract_pain_scale(self.user_input)
+        if explicit_pain is not None:
+            return explicit_pain
+
+        previous_candidates = [
+            self.existing_context.get("pain_level_reported"),
+            self.existing_context.get("pain_level"),
+            self.existing_context.get("pain_scale"),
+        ]
+        if isinstance(self.existing_context.get("hybrid_state"), dict):
+            previous_candidates.append(self.existing_context["hybrid_state"].get("last_pain_scale"))
+
+        for value in previous_candidates:
+            if isinstance(value, int) and 0 <= value <= 10:
+                return value
+
+        # Keep previous behavior for truly fresh context without prior pain evidence.
         return 2
 
     def _is_first_clinical_turn(self):

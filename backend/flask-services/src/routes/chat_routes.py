@@ -1,5 +1,6 @@
 from flask import jsonify, request
 import logging
+from datetime import datetime
 from . import bp
 from routes.utils import process_message_logic, conversational_dataset_manager
 from services.auth.auth import get_user_id_token
@@ -8,6 +9,15 @@ from services.process_data.medical_data import MedicalDataProcessor
 
 # Configurar logger
 logger = logging.getLogger(__name__)
+
+
+def _serialize_timestamp(value):
+    """Serializa timestamps sin romper si ya vienen como string desde Redis."""
+    if value is None:
+        return value
+    if isinstance(value, datetime):
+        return value.isoformat()
+    return str(value)
 
 @bp.route('/message', methods=['POST'])
 def process_message():
@@ -52,7 +62,7 @@ def get_user_conversations():
             if '_id' in conv:
                 conv['_id'] = str(conv['_id'])
             if 'timestamp' in conv:
-                conv['timestamp'] = conv['timestamp'].isoformat()
+                conv['timestamp'] = _serialize_timestamp(conv.get('timestamp'))
         
         return jsonify({"conversations": conversations})
     except Exception as e:
@@ -80,7 +90,7 @@ def get_conversation(conversation_id):
         if '_id' in conversation:
             conversation['_id'] = str(conversation['_id'])
         if 'timestamp' in conversation:
-            conversation['timestamp'] = conversation['timestamp'].isoformat()
+            conversation['timestamp'] = _serialize_timestamp(conversation.get('timestamp'))
         
         return jsonify({"conversation": conversation})
     except Exception as e:

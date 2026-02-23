@@ -107,15 +107,15 @@ class ConversationalDatasetManager:
         try:
             update_data = {"timestamp": datetime.now()}
             
-            if messages:
+            if messages is not None:
                 update_data["messages"] = messages
-            if symptoms:
+            if symptoms is not None:
                 update_data["symptoms"] = symptoms
-            if symptoms_pattern:
+            if symptoms_pattern is not None:
                 update_data["symptoms_pattern"] = symptoms_pattern
-            if pain_scale:
+            if pain_scale is not None:
                 update_data["pain_scale"] = pain_scale
-            if triaje_level:
+            if triaje_level is not None:
                 update_data["triaje_level"] = triaje_level
             if medical_context is not None:
                 update_data["medical_context"] = medical_context

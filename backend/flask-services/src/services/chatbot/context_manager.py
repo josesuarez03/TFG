@@ -1,4 +1,46 @@
 from services.chatbot.comprehend_medical import detect_entities
+import re
+
+
+def _extract_pain_level_reported(text):
+    if not text:
+        return None
+    lowered = text.strip().lower()
+
+    # Accept direct short answers like "4" or "un 4"
+    direct = re.fullmatch(r"(?:un|una)?\s*(10|[1-9])", lowered)
+    if direct:
+        return int(direct.group(1))
+
+    # Accept answers that mention pain intensity explicitly
+    contextual = re.search(r"(?:dolor|intensidad|escala|nivel)[^\d]{0,12}(10|[1-9])", lowered)
+    if contextual:
+        return int(contextual.group(1))
+
+    return None
+
+
+def _extract_symptom_duration(text):
+    if not text:
+        return None
+    lowered = text.strip().lower()
+    if re.search(r"\b(desde|hace|ayer|anoche|hoy|mañana|tarde|semana|mes|año|hora|minuto)\b", lowered):
+        return text.strip()
+    return None
+
+
+def _extract_red_flags_answer(text):
+    if not text:
+        return None
+    lowered = text.strip().lower()
+    has_red_flags = re.search(
+        r"(dificultad para respirar|dolor de pecho|desmayo|fiebre|convuls|sangrado|debilidad)",
+        lowered,
+    )
+    has_negation = re.search(r"\b(no|ninguno|ninguna|nada|niego|sin)\b", lowered)
+    if has_red_flags:
+        return "no" if has_negation else "sí"
+    return None
 
 def init_context(text, user_data=None, existing_context=None):
     entities = detect_entities(text)
@@ -39,6 +81,22 @@ def init_context(text, user_data=None, existing_context=None):
 
     if text and not context.get("chief_complaint"):
         context["chief_complaint"] = text.strip()
+
+    # Infer structured answers from free text so asked questions are not repeated
+    if context.get("symptom_duration") in (None, "", [], {}):
+        duration = _extract_symptom_duration(text)
+        if duration:
+            context["symptom_duration"] = duration
+
+    if context.get("pain_level_reported") in (None, "", [], {}):
+        pain_value = _extract_pain_level_reported(text)
+        if pain_value is not None:
+            context["pain_level_reported"] = pain_value
+
+    if context.get("red_flags_checked") in (None, "", [], {}):
+        red_flags = _extract_red_flags_answer(text)
+        if red_flags:
+            context["red_flags_checked"] = red_flags
 
     # Prioridad clínica de preguntas (menor número = más prioridad)
     missing_question_meta = []

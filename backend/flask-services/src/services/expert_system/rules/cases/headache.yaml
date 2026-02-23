@@ -2,6 +2,9 @@ case_id: headache_case
 name: Cefalea
 intent_keywords:
   - dolor de cabeza
+  - dolor en la cabeza
+  - me duele la cabeza
+  - me duele cabeza
   - cefalea
   - migraña
   - jaqueca
