@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/hooks/useAuth';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -23,15 +23,25 @@ import {
 } from 'react-icons/tb';
 import API from '@/services/api';
 import { ROUTES } from '@/routes/routePaths';
-import { UserProfile } from '@/types/user';
+type PatientMedicalData = {
+  triaje_level?: string | null;
+  pain_scale?: number | null;
+  medical_context?: string | null;
+  allergies?: string | null;
+  medications?: string | null;
+  medical_history?: string | null;
+  data_validated_at?: string | null;
+  is_data_validated?: boolean;
+};
 
 export default function MedicalData() {
   const router = useRouter();
   const { user } = useAuth();
   const [loading, setLoading] = useState(true);
-  const [patientData, setPatientData] = useState<UserProfile | null>(null);
+  const [patientData, setPatientData] = useState<PatientMedicalData | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+  const requestInFlightRef = useRef(false);
 
   const fetchPatientData = useCallback(async () => {
     const response = await API.get('patients/me/');
@@ -40,6 +50,8 @@ export default function MedicalData() {
 
   const getPatientData = useCallback(
     async (showRefreshing = false) => {
+      if (requestInFlightRef.current) return;
+      requestInFlightRef.current = true;
       try {
         showRefreshing ? setRefreshing(true) : setLoading(true);
         const data = await fetchPatientData();
@@ -50,22 +62,23 @@ export default function MedicalData() {
       } finally {
         setLoading(false);
         setRefreshing(false);
+        requestInFlightRef.current = false;
       }
     },
     [fetchPatientData]
   );
 
   useEffect(() => {
-    if (!user) {
+    if (!user?.id) {
       router.push(ROUTES.PUBLIC.LOGIN);
       return;
     }
-    if (user.tipo !== 'patient') {
+    if (user?.tipo !== 'patient') {
       router.push(ROUTES.PROTECTED.DASHBOARD);
       return;
     }
-    getPatientData();
-  }, [user?.id, user?.tipo, router, getPatientData]);
+    void getPatientData();
+  }, [user?.id, user?.tipo]);
 
   const getTriageColorClass = (level: string | null | undefined) => {
     if (!level) return 'bg-gray-100 text-gray-800 border-gray-200';
@@ -150,7 +163,7 @@ export default function MedicalData() {
           <CardContent className="pt-5">
             <p className="text-sm text-muted-foreground">Estado de validación</p>
             <div className="mt-2">
-              {patientData.patient?.is_data_validate ? (
+              {patientData.is_data_validated ? (
                 <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
                   <TbClipboardCheck className="h-3 w-3 mr-1" />
                   Validado por médico
@@ -168,8 +181,8 @@ export default function MedicalData() {
           <CardContent className="pt-5">
             <p className="text-sm text-muted-foreground">Nivel de triaje</p>
             <div className="mt-2">
-              <Badge className={getTriageColorClass(patientData.patient?.triaje_level)}>
-                {patientData.patient?.triaje_level ? `Triaje: ${patientData.patient.triaje_level}` : 'Sin clasificación'}
+              <Badge className={getTriageColorClass(patientData.triaje_level)}>
+                {patientData.triaje_level ? `Triaje: ${patientData.triaje_level}` : 'Sin clasificación'}
               </Badge>
             </div>
           </CardContent>
@@ -181,11 +194,11 @@ export default function MedicalData() {
             <div className="flex items-center gap-3 mt-2">
               <div className="w-full bg-gray-200 rounded-full h-2.5">
                 <div
-                  className={`h-2.5 rounded-full ${getPainScaleColorClass(patientData.patient?.pain_scale)}`}
-                  style={{ width: `${((patientData.patient?.pain_scale || 0) / 10) * 100}%` }}
+                  className={`h-2.5 rounded-full ${getPainScaleColorClass(patientData.pain_scale)}`}
+                  style={{ width: `${((patientData.pain_scale || 0) / 10) * 100}%` }}
                 />
               </div>
-              <span className="text-sm font-semibold">{patientData.patient?.pain_scale ?? 0}/10</span>
+              <span className="text-sm font-semibold">{patientData.pain_scale ?? 0}/10</span>
             </div>
           </CardContent>
         </Card>
@@ -205,22 +218,22 @@ export default function MedicalData() {
               {
                 icon: <TbFileText className="h-4 w-4 text-muted-foreground" />,
                 title: 'Contexto médico',
-                value: patientData.patient?.medical_context || 'No hay información disponible',
+                value: patientData.medical_context || 'No hay información disponible',
               },
               {
                 icon: <TbAlertTriangle className="h-4 w-4 text-muted-foreground" />,
                 title: 'Alergias',
-                value: patientData.patient?.allergies || 'No se han registrado alergias',
+                value: patientData.allergies || 'No se han registrado alergias',
               },
               {
                 icon: <TbPill className="h-4 w-4 text-muted-foreground" />,
                 title: 'Medicamentos',
-                value: patientData.patient?.medications || 'No se han registrado medicamentos',
+                value: patientData.medications || 'No se han registrado medicamentos',
               },
               {
                 icon: <TbHistory className="h-4 w-4 text-muted-foreground" />,
                 title: 'Historial médico',
-                value: patientData.patient?.medical_history || 'No se ha registrado historial médico',
+                value: patientData.medical_history || 'No se ha registrado historial médico',
               },
             ].map((block, idx) => (
               <div key={block.title}>
@@ -249,8 +262,8 @@ export default function MedicalData() {
               <p className="text-sm text-muted-foreground">Última validación</p>
               <p className="mt-2 flex items-center gap-2">
                 <TbClock className="h-4 w-4" />
-                {patientData.patient?.data_validated_at
-                  ? new Date(patientData.patient.data_validated_at).toLocaleDateString('es-ES', {
+                {patientData.data_validated_at
+                  ? new Date(patientData.data_validated_at).toLocaleDateString('es-ES', {
                       year: 'numeric',
                       month: 'long',
                       day: 'numeric',

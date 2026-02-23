@@ -1,6 +1,6 @@
 "use client";
 
-import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import axios from "axios";
 import {
@@ -17,6 +17,40 @@ import {
   syncAuthState,
   subscribeToAuthChanges,
 } from "@/utils/authSync";
+
+const USER_CACHE_KEY = "auth_user_cache_v1";
+const USER_CACHE_TTL_MS = 6 * 60 * 60 * 1000;
+
+type CachedUserPayload = {
+  user: UserProfile;
+  token: string;
+  cachedAt: number;
+};
+
+const readCachedUser = (): CachedUserPayload | null => {
+  try {
+    const raw = sessionStorage.getItem(USER_CACHE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as CachedUserPayload;
+    if (!parsed?.user || !parsed?.token || !parsed?.cachedAt) return null;
+    return parsed;
+  } catch {
+    return null;
+  }
+};
+
+const writeCachedUser = (user: UserProfile, token: string) => {
+  const payload: CachedUserPayload = {
+    user,
+    token,
+    cachedAt: Date.now(),
+  };
+  sessionStorage.setItem(USER_CACHE_KEY, JSON.stringify(payload));
+};
+
+const clearCachedUser = () => {
+  sessionStorage.removeItem(USER_CACHE_KEY);
+};
 
 type AuthContextValue = {
   user: UserProfile | null;
@@ -37,10 +71,16 @@ function useProvideAuth(): AuthContextValue {
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
+  const userRef = useRef<UserProfile | null>(null);
+
+  useEffect(() => {
+    userRef.current = user;
+  }, [user]);
 
   const clearSession = useCallback(() => {
     sessionStorage.removeItem("access_token");
     sessionStorage.removeItem("refresh_token");
+    clearCachedUser();
     clearAuthCookies();
     setUser(null);
     setIsAuthenticated(false);
@@ -65,17 +105,16 @@ function useProvideAuth(): AuthContextValue {
       const userProfile = await getUserProfile();
       setUser(userProfile);
       setIsAuthenticated(true);
+      writeCachedUser(userProfile, token);
       syncAuthState();
       return userProfile;
     } catch (err) {
-      setUser(null);
-      setIsAuthenticated(false);
-
       if (axios.isAxiosError(err) && err.response?.status === 401) {
         clearSession();
+        return null;
       }
 
-      return null;
+      return userRef.current;
     } finally {
       setLoading(false);
     }
@@ -160,20 +199,42 @@ function useProvideAuth(): AuthContextValue {
 
       if (!newAuthState) {
         setUser(null);
-      } else if (!user) {
-        fetchUserProfile();
+        clearCachedUser();
+      } else if (!userRef.current) {
+        const token = sessionStorage.getItem("access_token");
+        const cached = readCachedUser();
+        if (token && cached && cached.token === token) {
+          setUser(cached.user);
+          return;
+        }
+        void fetchUserProfile();
       }
     });
 
     return unsubscribe;
-  }, [fetchUserProfile, user]);
+  }, [fetchUserProfile]);
 
   useEffect(() => {
     const checkAuth = async () => {
       try {
         const isAuthFromStorage = checkStorageAuth();
         if (isAuthFromStorage) {
+          const token = sessionStorage.getItem("access_token");
+          const cached = readCachedUser();
           syncAuthState();
+
+          if (token && cached && cached.token === token) {
+            setUser(cached.user);
+            setIsAuthenticated(true);
+            setLoading(false);
+
+            const cacheAge = Date.now() - cached.cachedAt;
+            if (cacheAge > USER_CACHE_TTL_MS) {
+              void fetchUserProfile();
+            }
+            return;
+          }
+
           await fetchUserProfile();
         } else {
           setLoading(false);

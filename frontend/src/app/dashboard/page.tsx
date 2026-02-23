@@ -1,8 +1,9 @@
 "use client";
 
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
 import API from "@/services/api";
 import axios from "axios";
 import { useRouter } from "next/navigation";
@@ -100,9 +101,12 @@ export default function DashboardPage() {
   const [history, setHistory] = useState<HistoryEntry[]>([]);
   const [historyCount, setHistoryCount] = useState(0);
   const [patient, setPatient] = useState<PatientSummary | null>(null);
+  const requestInFlightRef = useRef(false);
 
   const loadDashboard = useCallback(
     async ({ silent = false }: { silent?: boolean } = {}) => {
+      if (requestInFlightRef.current) return;
+      requestInFlightRef.current = true;
       try {
         if (silent) {
           setRefreshing(true);
@@ -176,6 +180,7 @@ export default function DashboardPage() {
         setLoading(false);
         setRefreshing(false);
         setInitialLoadDone(true);
+        requestInFlightRef.current = false;
       }
     },
     [user?.tipo]
@@ -183,8 +188,8 @@ export default function DashboardPage() {
 
   useEffect(() => {
     if (!user?.id) return;
-    loadDashboard({ silent: initialLoadDone });
-  }, [initialLoadDone, loadDashboard, user?.id]);
+    void loadDashboard({ silent: false });
+  }, [user?.id, user?.tipo]);
 
   useEffect(() => {
     if (!user?.id || user?.tipo !== "patient") return;
@@ -219,9 +224,25 @@ export default function DashboardPage() {
   if (loading && !initialLoadDone) {
     return (
       <div className="space-y-6">
-        <section className="rounded-3xl bg-gradient-to-r from-blue-800 via-blue-700 to-blue-600 text-white p-6 md:p-8">
-          <p className="uppercase tracking-[0.1em] text-blue-200 text-xs md:text-sm font-semibold">Dashboard</p>
-          <h2 className="text-3xl md:text-5xl font-bold tracking-tight mt-1">Cargando panel...</h2>
+        <section className="rounded-3xl overflow-hidden bg-gradient-to-r from-blue-800 via-blue-700 to-blue-600 p-6 md:p-8">
+          <Skeleton className="h-4 w-28 bg-white/25" />
+          <Skeleton className="h-12 w-80 mt-4 bg-white/30" />
+          <Skeleton className="h-5 w-[28rem] mt-4 bg-white/25" />
+          <div className="mt-6 flex gap-3">
+            <Skeleton className="h-10 w-44 bg-white/30" />
+            <Skeleton className="h-10 w-40 bg-white/20" />
+          </div>
+        </section>
+
+        <section className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <Skeleton className="h-28 rounded-2xl" />
+          <Skeleton className="h-28 rounded-2xl" />
+          <Skeleton className="h-28 rounded-2xl" />
+        </section>
+
+        <section className="grid grid-cols-1 xl:grid-cols-[1.45fr_1fr] gap-4">
+          <Skeleton className="h-72 rounded-2xl" />
+          <Skeleton className="h-72 rounded-2xl" />
         </section>
       </div>
     );
