@@ -8,6 +8,7 @@ from services.auth.auth import get_user_id_from_token
 
 # Configurar logger
 logger = logging.getLogger(__name__)
+AUTHENTICATED_USERS_BY_SID = {}
 
 @socketio.on('connect')
 def handle_connect():
@@ -22,6 +23,7 @@ def handle_connect():
         logger.debug(f"Intentando autenticación para SID {sid} con token de query param.")
         user_id = get_user_id_from_token(token_from_query)
         if user_id:
+            AUTHENTICATED_USERS_BY_SID[sid] = user_id
             join_room(user_id) # Unir al usuario a una sala con su user_id
             emit('connection_success', {'status': 'connected', 'user_id': user_id})
             logger.info(f"Cliente {sid} autenticado como user_id {user_id} y unido a su room.")
@@ -42,6 +44,7 @@ def handle_connect():
 @socketio.on('disconnect')
 def handle_disconnect():
     sid = request.sid
+    AUTHENTICATED_USERS_BY_SID.pop(sid, None)
     # 'reason' puede no estar siempre disponible o ser fiable, depende del cliente y desconexión.
     # Flask-SocketIO no lo pasa directamente como argumento a la función de disconnect.
     logger.info(f"Cliente desconectado: {sid}")
@@ -63,6 +66,11 @@ def handle_chat_message(data):
         if token_from_payload:
             logger.debug(f"Intentando obtener user_id del token en payload de chat_message para SID {sid}.")
             user_id = get_user_id_from_token(token_from_payload)
+
+        if not user_id:
+            user_id = AUTHENTICATED_USERS_BY_SID.get(sid)
+            if user_id:
+                logger.info(f"WebSocket (SID {sid}): Usando user_id autenticado en conexión: '{user_id}'.")
 
         if not user_id:
             user_id_from_data = data.get('user_id')
@@ -156,6 +164,11 @@ def handle_sync_request(data):
         if token_from_payload:
             logger.debug(f"Intentando obtener user_id del token en payload de sync_request para SID {sid}.")
             user_id = get_user_id_from_token(token_from_payload)
+
+        if not user_id:
+            user_id = AUTHENTICATED_USERS_BY_SID.get(sid)
+            if user_id:
+                logger.info(f"WebSocket (SID {sid}): Usando user_id autenticado en conexión para sync: '{user_id}'.")
         
         if not user_id:
             user_id_from_data = data.get('user_id')

@@ -10,6 +10,8 @@ services:
       postgres:
         condition: service_healthy
     restart: on-failure
+    env_file:
+      - .env
     environment:
       - IN_DOCKER=True
       - DJANGO_SECRET_KEY=${DJANGO_SECRET_KEY}
@@ -26,8 +28,6 @@ services:
       - REDIS_HOST=redis
       - REDIS_PORT=6379
       - REDIS_DB=${REDIS_DB1}
-    env_file:
-      - .env
     networks:
       - app
 
@@ -44,6 +44,8 @@ services:
       redis:
         condition: service_healthy
     restart: on-failure
+    env_file:
+      - .env
     environment:
       - IN_DOCKER=True
       - MONGO_HOST=mongo
@@ -59,8 +61,6 @@ services:
       - AWS_REGION=${AWS_REGION}
       - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
       - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
-      - BEDROCK_EMBEDDING_MODEL_ID=${BEDROCK_EMBEDDING_MODEL_ID}
-      - BEDROCK_CLAUDE_MODEL_ID=${BEDROCK_CLAUDE_MODEL_ID}
     networks:
       - app
 

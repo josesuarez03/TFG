@@ -22,6 +22,7 @@ class Config:
     AWS_REGION = os.getenv("AWS_REGION")
     BEDROCK_EMBEDDING_MODEL_ID = os.getenv("BEDROCK_EMBEDDING_MODEL_ID")
     BEDROCK_CLAUDE_MODEL_ID = os.getenv("BEDROCK_CLAUDE_MODEL_ID")
+    BEDROCK_CLAUDE_INFERENCE_PROFILE_ID = os.getenv("BEDROCK_CLAUDE_INFERENCE_PROFILE_ID")
 
     # Configuración MongoDB - usar nombres de host de Docker si estamos en contenedores
     MONGO_HOST = os.getenv("MONGO_HOST", "localhost")

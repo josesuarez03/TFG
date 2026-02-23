@@ -2,6 +2,9 @@ import boto3
 from botocore.exceptions import ClientError
 from config.config import Config
 import json
+import logging
+
+logger = logging.getLogger(__name__)
 
 def call_claude(prompt, triage_level=None, max_tokens=500, temperature=0.1, initial_prompt=None):
 
@@ -10,7 +13,11 @@ def call_claude(prompt, triage_level=None, max_tokens=500, temperature=0.1, init
         region_name=Config.AWS_REGION
     )
 
-    model_id = Config.BEDROCK_CLAUDE_MODEL_ID
+    model_id = Config.BEDROCK_CLAUDE_INFERENCE_PROFILE_ID or Config.BEDROCK_CLAUDE_MODEL_ID
+    if not model_id:
+        raise ValueError(
+            "Falta configuración Bedrock: define BEDROCK_CLAUDE_INFERENCE_PROFILE_ID o BEDROCK_CLAUDE_MODEL_ID."
+        )
 
     # Handle different prompt formats
     if isinstance(prompt, dict):
@@ -49,8 +56,25 @@ def call_claude(prompt, triage_level=None, max_tokens=500, temperature=0.1, init
         result = json.loads(response['body'].read())
         return result['content'][0]['text']
     
-    except (ClientError, Exception) as e:
-        print(f"ERROR: Can't invoke '{model_id}'. Reason: {e}")
+    except ClientError as e:
+        err = (e.response or {}).get("Error", {})
+        code = err.get("Code", "")
+        message = err.get("Message", "")
+
+        if (
+            code == "ValidationException"
+            and "on-demand throughput isn’t supported" in message
+            and not Config.BEDROCK_CLAUDE_INFERENCE_PROFILE_ID
+        ):
+            raise RuntimeError(
+                "El modelo configurado requiere Inference Profile. "
+                "Configura BEDROCK_CLAUDE_INFERENCE_PROFILE_ID o usa un model ID on-demand soportado."
+            ) from e
+
+        logger.error("Can't invoke '%s'. Reason: %s", model_id, e)
+        raise
+    except Exception as e:
+        logger.error("Can't invoke '%s'. Reason: %s", model_id, e)
         raise
 
 def _format_context_prompt(context_dict, initial_prompt=None):
