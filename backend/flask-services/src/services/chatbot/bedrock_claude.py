@@ -10,7 +10,7 @@ def call_claude(prompt, triage_level=None, max_tokens=500, temperature=0.1, init
         region_name=Config.AWS_REGION
     )
 
-    model_id = "us.anthropic.claude-3-5-haiku-20241022-v1:0"
+    model_id = Config.BEDROCK_CLAUDE_MODEL_ID
 
     # Handle different prompt formats
     if isinstance(prompt, dict):
