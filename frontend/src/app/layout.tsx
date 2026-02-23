@@ -1,8 +1,17 @@
 import React from "react";
+import { Exo_2 } from "next/font/google";
 import ContentLayout from "@/components/layout/ContentLayout";
 import { ThemeProvider } from "@/components/theme-provider";
 import "@/styles/globals.css";
 import AuthStateSync from "@/components/AuthStateSync";
+import { AuthProvider } from "@/hooks/useAuth";
+
+const appFont = Exo_2({
+    subsets: ["latin"],
+    weight: ["400", "500", "600", "700", "800"],
+    variable: "--font-app",
+    display: "swap",
+});
 
 export const metadata = {
     title: {
@@ -27,10 +36,12 @@ export default function RootLayout({
                 <meta name="apple-mobile-web-app-status-bar-style" content="default" />
                 <link rel="apple-touch-icon" href="/assets/img/icon192.png" />
             </head>
-            <body className="antialiased">
+            <body className={`${appFont.variable} antialiased`}>
                 <ThemeProvider>
-                    <AuthStateSync />
-                    <ContentLayout>{children}</ContentLayout>
+                    <AuthProvider>
+                        <AuthStateSync />
+                        <ContentLayout>{children}</ContentLayout>
+                    </AuthProvider>
                 </ThemeProvider>
             </body>
         </html>

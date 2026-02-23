@@ -49,24 +49,24 @@ export default function Sidebar() {
   const navItemClass = (active: boolean) =>
     `group relative flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition ${
       active
-        ? "bg-blue-700 text-white shadow-md before:absolute before:left-0 before:top-2 before:bottom-2 before:w-1 before:rounded-r-full before:bg-blue-300"
+        ? "bg-blue-700 dark:bg-[#2E5CE6] text-white shadow-md before:absolute before:left-0 before:top-2 before:bottom-2 before:w-1 before:rounded-r-full before:bg-blue-300 dark:before:bg-[#9AB0FF]"
         : "text-white/75 hover:bg-white/10 hover:text-white"
     }`;
 
   return (
     <aside
-      className={`h-screen shrink-0 bg-blue-800 text-white border-r border-white/10 transition-all duration-300 ${
+      className={`h-screen shrink-0 bg-blue-800 dark:bg-[#08142E] text-white border-r border-white/10 dark:border-[#243864]/80 transition-all duration-300 ${
         isExpanded ? "w-60" : "w-[74px]"
       }`}
     >
       <div className="h-full flex flex-col">
-        <div className="px-3 py-4 border-b border-white/10">
+        <div className="px-3 py-4 border-b border-white/10 dark:border-[#243864]/80">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2 overflow-hidden">
-              <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center shadow">
-                <Image src="/assets/img/logo.png" alt="Medicheck" width={20} height={20} />
+              <div className="relative w-10 h-10 rounded-xl overflow-hidden shadow">
+                <Image src="/assets/img/icon192.png" alt="Medicheck" fill className="object-cover" sizes="40px" />
               </div>
-              {isExpanded && <span className="font-semibold tracking-tight text-lg">medicheck</span>}
+              {isExpanded && <span className="font-bold tracking-tight text-2xl leading-none">medicheck</span>}
             </div>
             <Button
               variant="ghost"
@@ -83,7 +83,7 @@ export default function Sidebar() {
         <div className="px-3 py-3">
           <Link
             href={ROUTES.PROTECTED.PROFILE}
-            className="flex items-center gap-3 rounded-xl border border-white/20 bg-white/10 p-3 hover:bg-white/15 transition"
+            className="flex items-center gap-3 rounded-xl border border-white/20 dark:border-[#2A3F6C] bg-white/10 dark:bg-white/5 p-3 hover:bg-white/15 dark:hover:bg-white/10 transition"
           >
             <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-blue-300 to-blue-500 text-white text-sm font-semibold flex items-center justify-center">
               {initials}
@@ -91,8 +91,8 @@ export default function Sidebar() {
             {isExpanded && (
               <div className="min-w-0">
                 <p className="text-sm font-semibold truncate">{`${user?.first_name || ""} ${user?.last_name || ""}`.trim() || "Usuario"}</p>
-                <p className="text-xs text-blue-100 flex items-center gap-1">
-                  <span className="w-1.5 h-1.5 rounded-full bg-blue-300" />
+                <p className="text-xs text-blue-100 dark:text-[#B8CBFF] flex items-center gap-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-blue-300 dark:bg-emerald-300" />
                   {isDoctor ? "Médico · Activo" : "Paciente · Activo"}
                 </p>
               </div>
@@ -101,7 +101,7 @@ export default function Sidebar() {
         </div>
 
         <nav className="flex-1 overflow-y-auto px-2 pb-2">
-          {isExpanded && <p className="px-2 pt-2 pb-1 text-[11px] uppercase tracking-[0.12em] text-white/35">Principal</p>}
+          {isExpanded && <p className="px-2 pt-2 pb-1 text-[11px] uppercase tracking-[0.12em] text-white/40 dark:text-[#7E92C5]">Principal</p>}
           <div className="space-y-1">
             {NAVIGATION_ITEMS.main.map((item) => (
               <Link key={item.path} href={item.path} className={navItemClass(pathname === item.path)}>
@@ -111,7 +111,7 @@ export default function Sidebar() {
             ))}
           </div>
 
-          {isExpanded && <p className="px-2 pt-5 pb-1 text-[11px] uppercase tracking-[0.12em] text-white/35">Historial</p>}
+          {isExpanded && <p className="px-2 pt-5 pb-1 text-[11px] uppercase tracking-[0.12em] text-white/40 dark:text-[#7E92C5]">Historial</p>}
           <div className="space-y-1">
             <button type="button" className={navItemClass(false) + " w-full text-left"}>
               <span className="text-lg">
@@ -130,7 +130,7 @@ export default function Sidebar() {
           {isDoctor && (
             <>
               {isExpanded && (
-                <p className="px-2 pt-5 pb-1 text-[11px] uppercase tracking-[0.12em] text-white/35">Doctor</p>
+                <p className="px-2 pt-5 pb-1 text-[11px] uppercase tracking-[0.12em] text-white/40 dark:text-[#7E92C5]">Doctor</p>
               )}
               <div className="space-y-1">
                 {NAVIGATION_ITEMS.doctor.map((item) => (
@@ -144,7 +144,7 @@ export default function Sidebar() {
           )}
         </nav>
 
-        <div className="px-2 py-3 border-t border-white/10 space-y-1">
+        <div className="px-2 py-3 border-t border-white/10 dark:border-[#243864]/80 space-y-1">
           <button type="button" className={navItemClass(false) + " w-full text-left"}>
             <span className="text-lg">
               <TbSettings />

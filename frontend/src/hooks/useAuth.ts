@@ -1,4 +1,6 @@
-import { useState, useEffect, useCallback } from "react";
+"use client";
+
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import axios from "axios";
 import {
@@ -16,7 +18,20 @@ import {
   subscribeToAuthChanges,
 } from "@/utils/authSync";
 
-export function useAuth() {
+type AuthContextValue = {
+  user: UserProfile | null;
+  loading: boolean;
+  error: string | null;
+  isAuthenticated: boolean;
+  login: (username_or_email: string, password: string) => Promise<UserProfile | null>;
+  loginWithGoogle: (googleToken: string, tipo: string) => Promise<UserProfile | null>;
+  logout: () => Promise<void>;
+  refreshProfile: () => Promise<UserProfile | null>;
+};
+
+const AuthContext = createContext<AuthContextValue | null>(null);
+
+function useProvideAuth(): AuthContextValue {
   const router = useRouter();
   const [user, setUser] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
@@ -184,14 +199,31 @@ export function useAuth() {
     };
   }, [checkStorageAuth, fetchUserProfile]);
 
-  return {
-    user,
-    loading,
-    error,
-    isAuthenticated,
-    login,
-    loginWithGoogle,
-    logout,
-    refreshProfile: fetchUserProfile,
-  };
+  return useMemo(
+    () => ({
+      user,
+      loading,
+      error,
+      isAuthenticated,
+      login,
+      loginWithGoogle,
+      logout,
+      refreshProfile: fetchUserProfile,
+    }),
+    [error, fetchUserProfile, isAuthenticated, loading, login, loginWithGoogle, logout, user]
+  );
+}
+
+export function AuthProvider({ children }: { children: React.ReactNode }) {
+  const auth = useProvideAuth();
+  return React.createElement(AuthContext.Provider, { value: auth }, children);
+}
+
+export function useAuth() {
+  const context = useContext(AuthContext);
+  if (!context) {
+    throw new Error("useAuth must be used within an AuthProvider");
+  }
+
+  return context;
 }

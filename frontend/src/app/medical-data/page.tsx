@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/hooks/useAuth';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -22,40 +22,37 @@ import {
   TbArrowRight,
 } from 'react-icons/tb';
 import API from '@/services/api';
-import { useApiError } from '@/hooks/useApiError';
 import { ROUTES } from '@/routes/routePaths';
 import { UserProfile } from '@/types/user';
 
 export default function MedicalData() {
   const router = useRouter();
   const { user } = useAuth();
-  const { handleApiError } = useApiError();
   const [loading, setLoading] = useState(true);
   const [patientData, setPatientData] = useState<UserProfile | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
 
-  const fetchPatientData = async () => {
+  const fetchPatientData = useCallback(async () => {
     const response = await API.get('patients/me/');
     return response.data;
-  };
+  }, []);
 
-  const getPatientData = React.useCallback(
+  const getPatientData = useCallback(
     async (showRefreshing = false) => {
       try {
         showRefreshing ? setRefreshing(true) : setLoading(true);
         const data = await fetchPatientData();
         setPatientData(data);
         setError(null);
-      } catch (err) {
+      } catch {
         setError('Error al cargar tus datos médicos');
-        handleApiError(err);
       } finally {
         setLoading(false);
         setRefreshing(false);
       }
     },
-    [handleApiError]
+    [fetchPatientData]
   );
 
   useEffect(() => {
@@ -68,7 +65,7 @@ export default function MedicalData() {
       return;
     }
     getPatientData();
-  }, [user, router, getPatientData]);
+  }, [user?.id, user?.tipo, router, getPatientData]);
 
   const getTriageColorClass = (level: string | null | undefined) => {
     if (!level) return 'bg-gray-100 text-gray-800 border-gray-200';

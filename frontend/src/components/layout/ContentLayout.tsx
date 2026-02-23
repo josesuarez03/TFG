@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect } from "react";
 import Sidebar from "@/components/Sidebar";
 import Header from "@/components/Header";
 import Loading from "@/components/loading";
@@ -12,15 +12,7 @@ export default function ContentLayout({ children }: { children: React.ReactNode 
     const { isAuthenticated, loading } = useAuth();
     const pathname = usePathname();
     const router = useRouter();
-    const [isLoading, setIsLoading] = useState(true);
     const safePath = pathname || "";
-
-    // Verificar si la ruta actual es pública de manera más explícita
-    const isPublicRoute = Object.values(ROUTES.PUBLIC).some(route => 
-        pathname === route || 
-        (pathname && pathname.startsWith(`${route}/`)) ||
-        (pathname && pathname.startsWith(route) && pathname.charAt(route.length) === '?')
-    );
 
     // Determinar si es una ruta protegida explícitamente
     const isProtectedRoute = Object.values(ROUTES.PROTECTED).some(route => 
@@ -41,10 +33,7 @@ export default function ContentLayout({ children }: { children: React.ReactNode 
 
     // Handle navigation and auth state
     useEffect(() => {
-        // Solo proceder si no está cargando
         if (!loading) {
-            setIsLoading(false);
-            
             // Manejar redirección de la ruta raíz
             if (pathname === '/') {
                 if (isAuthenticated) {
@@ -65,14 +54,14 @@ export default function ContentLayout({ children }: { children: React.ReactNode 
     }, [isAuthenticated, isProtectedRoute, isDoctorRoute, loading, pathname, router, safePath]);
     
     // Mostrar componente de carga mientras se determina el estado de autenticación
-    if (loading || isLoading) {
+    if (loading) {
         return <Loading />;
     }
 
     // Layout completo para usuarios autenticados en rutas no públicas
     if (shouldShowFullLayout) {
         return (
-            <div className="flex h-screen bg-gradient-to-b from-slate-100 to-slate-50 dark:from-slate-950 dark:to-slate-900">
+            <div className="flex h-screen bg-gradient-to-b from-slate-100 to-slate-50 dark:from-[#071228] dark:via-[#0B1836] dark:to-[#0E1D40]">
                 <Sidebar />
                 <div className="flex flex-col flex-1 overflow-hidden">
                     <Header />
@@ -88,7 +77,7 @@ export default function ContentLayout({ children }: { children: React.ReactNode 
       
     // Layout simple para rutas públicas
     return (
-        <div className="min-h-screen bg-gradient-to-b from-slate-100 to-slate-50 dark:from-slate-950 dark:to-slate-900">
+        <div className="min-h-screen bg-gradient-to-b from-slate-100 to-slate-50 dark:from-[#071228] dark:via-[#0B1836] dark:to-[#0E1D40]">
             <div className="flex justify-center items-center min-h-screen px-4 py-8">
                 {children}
             </div>
