@@ -1,11 +1,11 @@
 from flask import jsonify, request
 import logging
+import uuid
 from datetime import datetime
 from . import bp
 from routes.utils import process_message_logic, conversational_dataset_manager
 from services.auth.auth import get_user_id_token
-from services.api.send_api import send_data_to_django
-from services.process_data.medical_data import MedicalDataProcessor
+from services.process_data.etl_runner import execute_etl_once
 
 # Configurar logger
 logger = logging.getLogger(__name__)
@@ -160,26 +160,93 @@ def process_medical_data():
         return jsonify({"error": "Se requiere ID de conversación"}), 400
     
     try:
-        # Process the medical data from conversation
-        processor = MedicalDataProcessor(user_id)
-        medical_data = processor.process_medical_data(user_id, conversation_id)
-        
-        if not medical_data or 'error' in medical_data:
-            return jsonify(medical_data or {"error": "No se pudo procesar la conversación."}), 400
-        
-        # Send processed data to Django for storage
         auth_header = request.headers.get("Authorization")
         token = auth_header.split(" ", 1)[1] if auth_header and auth_header.lower().startswith("bearer ") else None
-        django_response = send_data_to_django(
+        run_id = str(uuid.uuid4())
+        reasons = ["manual_endpoint"]
+        queued_time = datetime.utcnow().isoformat()
+        conversational_dataset_manager.update_conversation_etl_state(
             user_id,
-            medical_data,
-            jwt_token=token,
-            base_url=django_api_url,
+            conversation_id,
+            {
+                "last_status": "queued",
+                "attempts": 0,
+                "last_run_id": run_id,
+                "last_reasons": reasons,
+                "last_error": "",
+                "last_attempt_at": queued_time,
+            },
         )
-        
+        conversational_dataset_manager.update_conversation_etl_state(
+            user_id,
+            conversation_id,
+            {
+                "last_status": "running",
+                "attempts": 1,
+                "last_run_id": run_id,
+                "last_reasons": reasons,
+                "last_error": "",
+                "last_attempt_at": datetime.utcnow().isoformat(),
+            },
+        )
+
+        etl_result = execute_etl_once(
+            user_id=user_id,
+            conversation_id=conversation_id,
+            jwt_token=token,
+            django_api_url=django_api_url,
+        )
+        success = bool(etl_result.get("success"))
+        medical_data = etl_result.get("medical_data")
+        django_response = etl_result.get("django_response")
+
+        if not medical_data or (isinstance(medical_data, dict) and medical_data.get("error")):
+            conversational_dataset_manager.update_conversation_etl_state(
+                user_id,
+                conversation_id,
+                {
+                    "last_status": "failed",
+                    "attempts": 1,
+                    "last_run_id": run_id,
+                    "last_reasons": reasons,
+                    "last_error": (medical_data or {}).get("error", "No se pudo procesar la conversación."),
+                    "last_attempt_at": datetime.utcnow().isoformat(),
+                },
+            )
+            return jsonify(medical_data or {"error": "No se pudo procesar la conversación."}), 400
+
+        if success:
+            success_time = datetime.utcnow().isoformat()
+            conversational_dataset_manager.update_conversation_etl_state(
+                user_id,
+                conversation_id,
+                {
+                    "last_status": "success",
+                    "attempts": 1,
+                    "last_run_id": run_id,
+                    "last_reasons": reasons,
+                    "last_error": "",
+                    "last_attempt_at": success_time,
+                    "last_success_at": success_time,
+                },
+            )
+        else:
+            conversational_dataset_manager.update_conversation_etl_state(
+                user_id,
+                conversation_id,
+                {
+                    "last_status": "failed",
+                    "attempts": 1,
+                    "last_run_id": run_id,
+                    "last_reasons": reasons,
+                    "last_error": str(etl_result.get("error") or "Error desconocido al enviar a backend principal."),
+                    "last_attempt_at": datetime.utcnow().isoformat(),
+                },
+            )
+
         return jsonify({
-            "success": True,
-            "message": "Datos médicos procesados correctamente.",
+            "success": success,
+            "message": "Datos médicos procesados correctamente." if success else "Datos médicos procesados con error de envío.",
             "medical_data": medical_data,
             "django_response": django_response
         })

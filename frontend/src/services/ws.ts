@@ -1,8 +1,10 @@
 import { io, Socket } from "socket.io-client";
+import type { ChatResponsePayload } from "@/types/messages";
 
 class SocketIOService {
   private socket: Socket | null = null;
-  private listeners: ((message: string) => void)[] = [];
+  private listeners: ((payload: ChatResponsePayload) => void)[] = [];
+  private errorListeners: ((message: string) => void)[] = [];
   private url: string;
 
   constructor(url: string) {
@@ -42,30 +44,48 @@ class SocketIOService {
     this.socket.on("chat_response", (data: unknown) => {
       this.handleIncomingMessage(data);
     });
+
+    this.socket.on("error", (data: unknown) => {
+      this.handleIncomingError(data);
+    });
+
+    this.socket.on("connect_error", (error: Error) => {
+      this.handleIncomingError(error?.message || "Error de conexión con el socket");
+    });
+
+    this.socket.on("connection_error", (data: unknown) => {
+      this.handleIncomingError(data);
+    });
   }
 
   private handleIncomingMessage(data: unknown): void {
-    let message = "";
+    let payload: ChatResponsePayload;
 
     if (typeof data === "string") {
-      message = data;
+      payload = { ai_response: data };
     } else if (data && typeof data === "object") {
-      const d = data as Record<string, unknown>;
-
-      if (typeof d.ai_response === "string") message = d.ai_response;
-      else if (typeof d.content === "string") message = d.content;
-      else if (typeof d.message === "string") message = d.message;
-      else if (typeof d.text === "string") message = d.text;
-      else if (typeof d.reply === "string") message = d.reply;
-      else if (typeof d.response === "string") message = d.response;
-      else if (d.ai_response) message = String(d.ai_response);
-      else message = JSON.stringify(data);
+      payload = data as ChatResponsePayload;
     } else {
-      message = String(data);
+      payload = { ai_response: String(data) };
     }
 
-    if (!message.trim()) return;
-    this.listeners.forEach((listener) => listener(message));
+    const text =
+      payload.ai_response ||
+      payload.response ||
+      (typeof payload.message === "string" ? payload.message : "");
+
+    if (!text.trim()) return;
+    this.listeners.forEach((listener) => listener(payload));
+  }
+
+  private handleIncomingError(data: unknown): void {
+    const message =
+      (data && typeof data === "object" && typeof (data as { error?: unknown }).error === "string"
+        ? (data as { error: string }).error
+        : typeof data === "string"
+          ? data
+          : "Error en comunicación con el asistente") || "Error en comunicación con el asistente";
+    this.errorListeners.forEach((listener) => listener(message));
   }
 
   sendMessage(message: string, additionalData?: Record<string, unknown>): boolean {
@@ -93,12 +113,20 @@ class SocketIOService {
     }
   }
 
-  addMessageListener(listener: (message: string) => void): void {
+  addMessageListener(listener: (payload: ChatResponsePayload) => void): void {
     this.listeners.push(listener);
   }
 
-  removeMessageListener(listener: (message: string) => void): void {
+  removeMessageListener(listener: (payload: ChatResponsePayload) => void): void {
     this.listeners = this.listeners.filter((l) => l !== listener);
+  }
+
+  addErrorListener(listener: (message: string) => void): void {
+    this.errorListeners.push(listener);
+  }
+
+  removeErrorListener(listener: (message: string) => void): void {
+    this.errorListeners = this.errorListeners.filter((l) => l !== listener);
   }
 
   isConnected(): boolean {

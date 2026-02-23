@@ -1,4 +1,5 @@
 from services.chatbot.comprehend_medical import detect_entities
+from services.chatbot.duration_utils import extract_duration_text
 import re
 
 
@@ -21,12 +22,7 @@ def _extract_pain_level_reported(text):
 
 
 def _extract_symptom_duration(text):
-    if not text:
-        return None
-    lowered = text.strip().lower()
-    if re.search(r"\b(desde|hace|ayer|anoche|hoy|mañana|tarde|semana|mes|año|hora|minuto)\b", lowered):
-        return text.strip()
-    return None
+    return extract_duration_text(text)
 
 
 def _extract_red_flags_answer(text):

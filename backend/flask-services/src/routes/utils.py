@@ -1,5 +1,8 @@
 import logging
 import json
+import re
+import unicodedata
+import uuid
 from datetime import datetime
 from typing import Any, Dict, List, Tuple
 from models.conversation import ConversationalDatasetManager
@@ -8,6 +11,7 @@ from services.chatbot.pain_utils import extract_pain_scale
 from services.api.send_api import get_patient_global_context
 from services.expert_system.orchestrator import ExpertOrchestrator
 from services.expert_system.fallback_adapter import FallbackModelAdapter
+from services.process_data.etl_runner import enqueue_etl_run
 
 # Configurar logger
 logger = logging.getLogger(__name__)
@@ -68,6 +72,14 @@ INITIAL_PROMPT = """Eres Hipo, un asistente virtual especializado exclusivamente
 TRIAGE_RANK = {"LEVE": 1, "MODERADO": 2, "SEVERO": 3}
 HYBRID_RESERVED_KEYS = {"analysis", "context_snapshot", "expert_state", "expert_trace", "hybrid_state"}
 SAFETY_QUESTION_HINTS = ("dificultad para respirar", "dolor de pecho", "desmayo", "fiebre", "convuls")
+EXPLICIT_CLOSE_PHRASES = (
+    "eso es todo",
+    "gracias termine",
+    "termine",
+    "fin",
+    "cerrar chat",
+    "hasta luego",
+)
 
 
 def _normalize_triage(level: str | None) -> str:
@@ -219,6 +231,48 @@ def _merge_questions(expert_questions: List[str], llm_questions: List[str], max_
     regular = [q for q in ordered if q not in safety]
     return (safety + regular)[:max_questions]
 
+
+def _compact_llm_guidance(text: str, max_len: int = 200) -> str:
+    if not text:
+        return ""
+    first_line = text.strip().splitlines()[0].strip()
+    if len(first_line) <= max_len:
+        return first_line
+    return first_line[: max_len - 3].rstrip() + "..."
+
+
+def _normalize_user_text(text: str) -> str:
+    lowered = (text or "").strip().lower()
+    no_accents = "".join(
+        ch for ch in unicodedata.normalize("NFKD", lowered) if unicodedata.category(ch) != "Mn"
+    )
+    no_punct = re.sub(r"[^\w\s]", " ", no_accents)
+    return re.sub(r"\s+", " ", no_punct).strip()
+
+
+def _detect_finalization(
+    user_message: str,
+    conversation_state: Dict[str, Any],
+    triage_level: str,
+    controller_mode: str,
+) -> Tuple[bool, List[str]]:
+    reasons: List[str] = []
+
+    next_intent = str((conversation_state or {}).get("next_intent", "")).strip().lower()
+    if next_intent == "triage_recommendation":
+        reasons.append("triage_recommendation")
+
+    if _normalize_triage(triage_level) == "Severo" or str(controller_mode).strip().lower() == "emergency_combined":
+        reasons.append("emergency")
+
+    normalized_message = _normalize_user_text(user_message)
+    if normalized_message:
+        if any(phrase in normalized_message for phrase in EXPLICIT_CLOSE_PHRASES):
+            reasons.append("explicit_close_phrase")
+
+    reasons = list(dict.fromkeys(reasons))
+    return len(reasons) > 0, reasons
+
 def process_message_logic(user_id, user_message, user_data, conversation_id, jwt_token=None):
     if not user_message.strip():
         return {"error": "El mensaje no puede estar vacío."}, 400
@@ -270,21 +324,63 @@ def process_message_logic(user_id, user_message, user_data, conversation_id, jwt
     triage_llm = _normalize_triage((llm_response_data or {}).get("triaje_level")) if llm_response_data else triage_expert
     triage_final = _max_triage_level(triage_expert, triage_llm)
 
-    active_case_locked = bool(prior_hybrid_state.get("active_case_locked"))
-    if prior_expert_state.get("active_case_id"):
-        active_case_locked = True
-    if expert_decision.state.active_case_id and expert_decision.action != "fallback_ai":
-        active_case_locked = True
+    prior_controller_mode = str(prior_hybrid_state.get("controller_mode") or "llm_primary")
+    if prior_controller_mode not in {"llm_primary", "expert_primary", "emergency_combined"}:
+        prior_controller_mode = "llm_primary"
 
-    controller_source = "expert"
-    if expert_decision.action == "fallback_ai" and llm_response_data:
-        controller_source = "llm"
-    elif (not active_case_locked) and llm_response_data and _triage_rank(triage_llm) > _triage_rank(triage_expert):
-        controller_source = "llm"
+    prior_active_case_locked = bool(prior_hybrid_state.get("active_case_locked"))
+    prior_non_match_streak = int(prior_hybrid_state.get("expert_non_match_streak") or 0)
 
-    selected = expert_response_data
-    if controller_source == "llm" and llm_response_data:
-        selected = llm_response_data
+    expert_active_case = bool(expert_decision.state.active_case_id)
+    expert_action = str(expert_decision.action or "")
+    previous_node_id = prior_expert_state.get("active_node_id")
+    current_node_id = expert_decision.state.active_node_id
+    node_advanced = bool(current_node_id != previous_node_id)
+    expert_emergency = bool(expert_decision.emergency_triggered or expert_action == "escalate")
+    expert_match = bool(expert_active_case and expert_action != "fallback_ai")
+    expert_non_match = bool(
+        expert_action == "fallback_ai"
+        or not expert_active_case
+        or (expert_action == "ask" and not node_advanced)
+    )
+
+    takeover_reason = None
+    handoff_reason = None
+
+    if expert_match:
+        expert_non_match_streak = 0
+    elif expert_non_match and (prior_controller_mode == "expert_primary" or prior_active_case_locked):
+        expert_non_match_streak = prior_non_match_streak + 1
+    else:
+        expert_non_match_streak = 0 if prior_controller_mode == "llm_primary" else prior_non_match_streak
+
+    if expert_emergency:
+        controller_mode = "emergency_combined"
+        takeover_reason = "emergency_detected"
+        active_case_locked = True
+        triage_final = "Severo"
+    elif expert_match:
+        controller_mode = "expert_primary"
+        active_case_locked = True
+        if prior_controller_mode != "expert_primary":
+            takeover_reason = "expert_case_match"
+    elif prior_controller_mode == "expert_primary" and expert_non_match_streak >= 2:
+        controller_mode = "llm_primary"
+        active_case_locked = False
+        handoff_reason = "expert_non_match_streak"
+    elif prior_controller_mode == "expert_primary":
+        controller_mode = "expert_primary"
+        active_case_locked = True
+    else:
+        controller_mode = "llm_primary"
+        active_case_locked = False
+
+    if controller_mode == "llm_primary":
+        selected = llm_response_data if llm_response_data else expert_response_data
+    elif controller_mode == "expert_primary":
+        selected = expert_response_data
+    else:
+        selected = expert_response_data
 
     explicit_pain = extract_pain_scale(user_message)
     if explicit_pain is not None:
@@ -313,21 +409,32 @@ def process_message_logic(user_id, user_message, user_data, conversation_id, jwt
 
     expert_questions = _extract_questions(expert_response_data)
     llm_questions = _extract_questions(llm_response_data)
-    if active_case_locked:
-        questions_selected = expert_questions[:2]
+    if controller_mode == "expert_primary":
+        questions_selected = expert_questions[:2] if expert_questions else _merge_questions(expert_questions, llm_questions, max_questions=2)
+    elif controller_mode == "llm_primary":
+        questions_selected = llm_questions[:2] if llm_questions else _merge_questions([], expert_questions, max_questions=2)
     else:
         questions_selected = _merge_questions(expert_questions, llm_questions, max_questions=2)
 
     conversation_state["questions_selected"] = questions_selected
     conversation_state["expert_state"] = expert_state
-    if active_case_locked:
+    if controller_mode == "expert_primary":
         conversation_state["missing_fields"] = [k for k, v in expert_decision.state.required_fields_status.items() if not v]
         conversation_state["collected_fields"] = [k for k, v in expert_decision.state.required_fields_status.items() if v]
         conversation_state["next_intent"] = (
             "collect_missing_data" if expert_decision.action == "ask" else "triage_recommendation"
         )
+    elif controller_mode == "llm_primary" and "next_intent" not in conversation_state:
+        conversation_state["next_intent"] = "collect_missing_data"
 
     response_text = selected.get("response") or expert_response_data.get("response") or ""
+    if controller_mode == "emergency_combined":
+        expert_emergency_text = expert_response_data.get("response") or response_text
+        llm_hint = _compact_llm_guidance((llm_response_data or {}).get("response", ""))
+        if llm_hint:
+            response_text = f"{expert_emergency_text}\n\nOrientación adicional: {llm_hint}"
+        else:
+            response_text = expert_emergency_text
     if not response_text.strip():
         if questions_selected:
             if len(questions_selected) == 1:
@@ -342,15 +449,14 @@ def process_message_logic(user_id, user_message, user_data, conversation_id, jwt
     symptoms_pattern = selected.get("symptoms_pattern", {})
     entities = selected.get("entities", [])
 
-    if llm_response_data:
-        if controller_source == "llm":
-            response_source = "llm"
-        elif triage_expert != triage_llm or bool(llm_questions):
-            response_source = "hybrid"
-        else:
-            response_source = "expert"
+    if controller_mode == "llm_primary":
+        response_source = "llm" if llm_response_data else "expert"
+    elif controller_mode == "expert_primary":
+        response_source = "expert"
     else:
-        response_source = controller_source
+        response_source = "hybrid"
+
+    controller_source = "llm" if controller_mode == "llm_primary" else ("expert" if controller_mode == "expert_primary" else "hybrid")
     expert_meta = {
         "used": True,
         "case_id": expert_decision.case_id,
@@ -361,20 +467,30 @@ def process_message_logic(user_id, user_message, user_data, conversation_id, jwt
         "fallback_reason": expert_decision.fallback_reason,
         "emergency_triggered": expert_decision.emergency_triggered,
         "controller_source": controller_source,
+        "controller_mode": controller_mode,
     }
     hybrid_state = {
+        "controller_mode": controller_mode,
         "expert_state": expert_state,
         "last_pain_scale": pain_scale,
         "active_case_locked": active_case_locked,
+        "expert_non_match_streak": expert_non_match_streak,
         "last_arbitration": {
             "controller": controller_source,
+            "controller_mode_prev": prior_controller_mode,
+            "controller_mode_next": controller_mode,
             "triage_expert": triage_expert,
             "triage_llm": triage_llm if llm_response_data else None,
             "triage_final": triage_final,
             "questions_selected_final": questions_selected,
+            "takeover_reason": takeover_reason,
+            "handoff_reason": handoff_reason,
             "timestamp": datetime.utcnow().isoformat(),
         },
     }
+    prior_etl_state = prior_hybrid_state.get("etl")
+    if isinstance(prior_etl_state, dict):
+        hybrid_state["etl"] = prior_etl_state
 
     logger.info(
         "chat_hybrid_turn %s",
@@ -383,8 +499,13 @@ def process_message_logic(user_id, user_message, user_data, conversation_id, jwt
                 "conversation_id": conversation_id,
                 "response_source": response_source,
                 "case_id": expert_decision.case_id,
+                "controller_mode_prev": prior_controller_mode,
+                "controller_mode_next": controller_mode,
                 "active_case_locked": active_case_locked,
                 "fallback_reason": expert_decision.fallback_reason,
+                "takeover_reason": takeover_reason,
+                "handoff_reason": handoff_reason,
+                "expert_non_match_streak": expert_non_match_streak,
                 "pain_prev": prior_pain,
                 "pain_new": pain_scale,
                 "triaje_experto": triage_expert,
@@ -422,6 +543,18 @@ def process_message_logic(user_id, user_message, user_data, conversation_id, jwt
         "missing_questions": selected.get("missing_questions", []),
         "analysis_type": "hybrid_system" if llm_response_data else selected.get("analysis_type", "expert_system"),
         "conversation_state": conversation_state,
+    }
+    etl_triggered, etl_reasons = _detect_finalization(
+        user_message=user_message,
+        conversation_state=conversation_state,
+        triage_level=triage_final,
+        controller_mode=controller_mode,
+    )
+    etl_payload = {
+        "triggered": False,
+        "status": "not_triggered",
+        "reasons": [],
+        "run_id": "",
     }
 
     messages = [
@@ -471,6 +604,29 @@ def process_message_logic(user_id, user_message, user_data, conversation_id, jwt
             response_data.get("pain_scale", 0),
             response_data.get("triaje_level", ""),
         )
+    if etl_triggered and conversation_id:
+        run_id = str(uuid.uuid4())
+        try:
+            enqueue_etl_run(
+                user_id=user_id,
+                conversation_id=conversation_id,
+                jwt_token=jwt_token,
+                reasons=etl_reasons,
+                run_id=run_id,
+            )
+            etl_payload = {
+                "triggered": True,
+                "status": "queued",
+                "reasons": etl_reasons,
+                "run_id": run_id,
+            }
+        except Exception as e:
+            logger.error(
+                "No se pudo encolar ETL para conversación %s del usuario %s: %s",
+                conversation_id,
+                user_id,
+                str(e),
+            )
     try:
         question_strategy = "single" if len(questions_selected) <= 1 else "dual"
         conversation_context_service.append_turn(
@@ -508,4 +664,5 @@ def process_message_logic(user_id, user_message, user_data, conversation_id, jwt
         "conversation_id": conversation_id,
         "response_source": response_source,
         "expert_system": expert_meta,
+        "etl": etl_payload,
     }, 200

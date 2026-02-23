@@ -29,9 +29,13 @@ def extract_pain_scale(text: str) -> Optional[int]:
     if direct:
         return int(direct.group(1))
 
-    standalone = re.search(r"\b(10|[0-9])\b", normalized)
-    if standalone:
-        return int(standalone.group(1))
+    # Accept short free-form replies like "es un 4" or "como 6" when the message is brief.
+    short_reply = re.fullmatch(
+        r"(?:es|sera|seria|como|aprox(?:imadamente)?|mas o menos)?\s*(?:un|una)?\s*(10|[0-9])",
+        normalized,
+    )
+    if short_reply:
+        return int(short_reply.group(1))
 
     for keyword, score in PAIN_KEYWORD_SCORES.items():
         if keyword in normalized:

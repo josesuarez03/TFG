@@ -23,7 +23,7 @@ export default function Header() {
   return (
     <header className="h-14 border-b border-border/70 bg-card/95 backdrop-blur-md px-4 md:px-6 flex items-center justify-between">
       <h1 className="text-lg md:text-xl font-semibold tracking-tight">
-        {pageTitle}, <span className="text-blue-600">{name}</span>
+        {pageTitle}, <span className="text-primary">{name}</span>
       </h1>
       <div className="flex items-center gap-2">
         <Button variant="outline" size="icon" aria-label="Notificaciones">

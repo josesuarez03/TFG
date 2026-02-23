@@ -2,6 +2,7 @@ import re
 import unicodedata
 from typing import Any, Dict, List, Optional, Tuple
 
+from services.chatbot.duration_utils import extract_duration_text
 from services.chatbot.pain_utils import extract_pain_scale
 
 
@@ -143,6 +144,11 @@ def _extract_with_rule(
 
     if extractor_type == "always_text":
         return user_message.strip()
+
+    if field_name == "duration":
+        duration = extract_duration_text(user_message)
+        if duration:
+            return duration
 
     default_keywords = _default_keywords_for_field(field_name)
     if default_keywords and any(keyword in user_message_lower for keyword in default_keywords):

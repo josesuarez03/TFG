@@ -92,7 +92,7 @@ export default function Sidebar() {
               <div className="min-w-0">
                 <p className="text-sm font-semibold truncate">{`${user?.first_name || ""} ${user?.last_name || ""}`.trim() || "Usuario"}</p>
                 <p className="text-xs text-blue-100 flex items-center gap-1">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+                  <span className="w-1.5 h-1.5 rounded-full bg-blue-300" />
                   {isDoctor ? "Médico · Activo" : "Paciente · Activo"}
                 </p>
               </div>

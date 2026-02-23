@@ -143,6 +143,80 @@ class ConversationalDatasetManager:
             logger.error(f"Error al actualizar conversación {conversation_id} para el usuario {user_id}: {str(e)}")
             raise
 
+    def update_conversation_etl_state(self, user_id, conversation_id, etl_state):
+        try:
+            if not isinstance(etl_state, dict):
+                etl_state = {}
+
+            existing_etl_state = {}
+            try:
+                current_conversation = self.get_conversation(user_id, conversation_id)
+                if isinstance(current_conversation, dict):
+                    medical_context = current_conversation.get("medical_context", {})
+                    if isinstance(medical_context, dict):
+                        hybrid_state = medical_context.get("hybrid_state", {})
+                        if isinstance(hybrid_state, dict):
+                            etl_payload = hybrid_state.get("etl", {})
+                            if isinstance(etl_payload, dict):
+                                existing_etl_state = etl_payload
+            except Exception as state_error:
+                logger.warning(
+                    "No se pudo recuperar estado ETL previo para conversación %s: %s",
+                    conversation_id,
+                    str(state_error),
+                )
+
+            merged_state = {**existing_etl_state, **etl_state}
+            update_data = {
+                "medical_context.hybrid_state.etl": merged_state,
+                "timestamp": datetime.now(),
+            }
+
+            result = self.collection.update_one(
+                {"user_id": user_id, "_id": self._uuid_to_binary(conversation_id)},
+                {"$set": update_data},
+            )
+            logger.info(
+                "Estado ETL actualizado en MongoDB para conversación %s usuario %s (modificados=%s)",
+                conversation_id,
+                user_id,
+                result.modified_count,
+            )
+
+            try:
+                cached_conversation = RedisCacheManager.obtener_conversacion(user_id, conversation_id)
+                if cached_conversation:
+                    medical_context_cached = cached_conversation.get("medical_context", {})
+                    if not isinstance(medical_context_cached, dict):
+                        medical_context_cached = {}
+
+                    hybrid_state_cached = medical_context_cached.get("hybrid_state", {})
+                    if not isinstance(hybrid_state_cached, dict):
+                        hybrid_state_cached = {}
+
+                    hybrid_state_cached["etl"] = merged_state
+                    medical_context_cached["hybrid_state"] = hybrid_state_cached
+                    cached_conversation["medical_context"] = medical_context_cached
+                    cached_conversation["timestamp"] = datetime.now().isoformat()
+                    RedisCacheManager.actualizar_conversacion(user_id, conversation_id, cached_conversation)
+                    logger.info(
+                        "Estado ETL actualizado en Redis para conversación %s usuario %s",
+                        conversation_id,
+                        user_id,
+                    )
+            except Exception as redis_error:
+                logger.warning(f"Error al actualizar estado ETL en Redis: {str(redis_error)}")
+
+            return result.modified_count
+        except Exception as e:
+            logger.error(
+                "Error al actualizar estado ETL para conversación %s usuario %s: %s",
+                conversation_id,
+                user_id,
+                str(e),
+            )
+            raise
+
     def mark_conversation_inactive(self, user_id, conversation_id):
         try:
             result = self.collection.update_one(

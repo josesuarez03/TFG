@@ -1,13 +1,15 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import SocketIOService from "@/services/ws";
+import type { ChatResponsePayload } from "@/types/messages";
 
 export type ConnectionState = "connecting" | "connected" | "disconnected" | "error";
 
 export const useSocketIO = (url: string, isAuthenticated?: boolean) => {
-  const [messages, setMessages] = useState<string[]>([]);
+  const [messages, setMessages] = useState<ChatResponsePayload[]>([]);
   const [socket, setSocket] = useState<SocketIOService | null>(null);
   const [connectionState, setConnectionState] = useState<ConnectionState>("disconnected");
   const [lastError, setLastError] = useState<string | null>(null);
+  const [socketError, setSocketError] = useState<string | null>(null);
   const connectionCheckRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
@@ -28,11 +30,17 @@ export const useSocketIO = (url: string, isAuthenticated?: boolean) => {
     const socketService = new SocketIOService(url);
     setSocket(socketService);
 
-    const handleMessage = (message: string) => {
-      setMessages((prev) => [...prev, message]);
+    const handleMessage = (payload: ChatResponsePayload) => {
+      setMessages((prev) => [...prev, payload]);
+      setSocketError(null);
+    };
+
+    const handleSocketError = (message: string) => {
+      setSocketError(message);
     };
 
     socketService.addMessageListener(handleMessage);
+    socketService.addErrorListener(handleSocketError);
 
     socketService
       .connect()
@@ -51,6 +59,7 @@ export const useSocketIO = (url: string, isAuthenticated?: boolean) => {
     return () => {
       if (connectionCheckRef.current) clearInterval(connectionCheckRef.current);
       socketService.removeMessageListener(handleMessage);
+      socketService.removeErrorListener(handleSocketError);
       socketService.disconnect();
       setSocket(null);
       setConnectionState("disconnected");
@@ -90,6 +99,7 @@ export const useSocketIO = (url: string, isAuthenticated?: boolean) => {
     if (!socket) return;
     setConnectionState("connecting");
     setLastError(null);
+    setSocketError(null);
     socket.disconnect();
     socket.connect().catch(() => {
       setConnectionState("error");
@@ -110,6 +120,7 @@ export const useSocketIO = (url: string, isAuthenticated?: boolean) => {
     socket,
     connectionState,
     lastError,
+    socketError,
     isConnected: connectionState === "connected",
     isConnecting: connectionState === "connecting",
     connectionError: lastError,
