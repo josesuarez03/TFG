@@ -30,8 +30,8 @@ CHAT_API.interceptors.request.use(
   (error) => Promise.reject(error)
 );
 
-export const getConversations = async (): Promise<ConversationSummary[]> => {
-  const response = await CHAT_API.get("conversations");
+export const getConversations = async (view: "active" | "archived" | "all" = "active"): Promise<ConversationSummary[]> => {
+  const response = await CHAT_API.get("conversations", { params: { view } });
   return response.data?.conversations || [];
 };
 
@@ -42,6 +42,18 @@ export const getConversation = async (conversationId: string): Promise<Conversat
 
 export const deleteConversation = async (conversationId: string): Promise<void> => {
   await CHAT_API.delete(`conversation/${conversationId}`);
+};
+
+export const archiveConversation = async (conversationId: string): Promise<void> => {
+  await CHAT_API.post(`conversation/${conversationId}/archive`);
+};
+
+export const recoverConversation = async (conversationId: string): Promise<void> => {
+  await CHAT_API.post(`conversation/${conversationId}/recover`);
+};
+
+export const deleteAllConversations = async (): Promise<void> => {
+  await CHAT_API.delete("conversations");
 };
 
 export default CHAT_API;

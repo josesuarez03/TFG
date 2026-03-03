@@ -1,25 +1,42 @@
 'use client';
 
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSocketIO } from '@/hooks/useWs';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import {
   TbAlertTriangle,
+  TbArchive,
   TbCircleDot,
   TbClipboardText,
   TbDotsVertical,
   TbFileDescription,
+  TbLock,
   TbMicrophone,
   TbPaperclip,
   TbPlugConnected,
   TbRefresh,
+  TbRestore,
   TbSearch,
   TbSend,
+  TbTrash,
 } from 'react-icons/tb';
-import { getConversation, getConversations } from '@/services/chatApi';
-import type { ChatResponsePayload, ConversationDetail, ConversationSummary, Message } from '@/types/messages';
+import {
+  archiveConversation,
+  deleteAllConversations,
+  deleteConversation,
+  getConversation,
+  getConversations,
+  recoverConversation,
+} from '@/services/chatApi';
+import type {
+  ChatResponsePayload,
+  ConversationDetail,
+  ConversationSummary,
+  LifecycleStatus,
+  Message,
+} from '@/types/messages';
 
 const RESPONSE_TIMEOUT_MS = 25000;
 const FALLBACK_QUICK_REPLIES = [
@@ -44,6 +61,15 @@ const relativeDate = (isoDate?: string) => {
   return `Hace ${days}d`;
 };
 
+const normalizeLifecycleStatus = (session?: Pick<ConversationSummary, 'lifecycle_status' | 'active'>): LifecycleStatus => {
+  const status = String(session?.lifecycle_status || '').toLowerCase();
+  if (status === 'archived' || status === 'deleted' || status === 'active') {
+    return status;
+  }
+  if (session?.active === false) return 'archived';
+  return 'active';
+};
+
 const triageBadgeClass = (triajeLevel?: string) => {
   const value = (triajeLevel || '').toLowerCase();
   if (value.includes('urgente')) return 'bg-red-100 text-red-800 border-red-300 dark:bg-red-950/40 dark:text-red-200 dark:border-red-800';
@@ -53,13 +79,9 @@ const triageBadgeClass = (triajeLevel?: string) => {
 };
 
 const extractSuggestions = (payload?: ChatResponsePayload) => {
-  const selected = payload?.conversation_state?.questions_selected;
-  if (Array.isArray(selected) && selected.length > 0) {
-    return selected.filter((v): v is string => typeof v === 'string' && v.trim().length > 0).slice(0, 4);
-  }
-  const missing = payload?.conversation_state?.missing_questions;
-  if (Array.isArray(missing) && missing.length > 0) {
-    return missing.filter((v): v is string => typeof v === 'string' && v.trim().length > 0).slice(0, 4);
+  const quickReplies = payload?.quick_replies;
+  if (Array.isArray(quickReplies) && quickReplies.length > 0) {
+    return quickReplies.filter((v): v is string => typeof v === 'string' && v.trim().length > 0).slice(0, 4);
   }
   return FALLBACK_QUICK_REPLIES;
 };
@@ -94,6 +116,8 @@ const sessionPreview = (session: ConversationSummary) => {
   return 'Sin vista previa';
 };
 
+type SessionView = 'active' | 'archived';
+
 export default function Chatbot() {
   const { user, isAuthenticated } = useAuth();
   const [input, setInput] = useState('');
@@ -105,9 +129,13 @@ export default function Chatbot() {
   const [sessions, setSessions] = useState<ConversationSummary[]>([]);
   const [loadingSessions, setLoadingSessions] = useState(true);
   const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
+  const [activeConversationStatus, setActiveConversationStatus] = useState<LifecycleStatus>('active');
   const [searchTerm, setSearchTerm] = useState('');
   const [quickReplies, setQuickReplies] = useState<string[]>(FALLBACK_QUICK_REPLIES);
   const [activeTriageLevel, setActiveTriageLevel] = useState<string>('');
+  const [sessionView, setSessionView] = useState<SessionView>('active');
+  const [sessionActionBusy, setSessionActionBusy] = useState<string | null>(null);
+  const [bulkActionBusy, setBulkActionBusy] = useState(false);
   const responseTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastProcessedSocketIndexRef = useRef(-1);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -124,6 +152,19 @@ export default function Chatbot() {
     reconnect,
   } = useSocketIO(socketUrl, isAuthenticated);
 
+  const refreshSessions = useCallback(
+    async (view: SessionView = sessionView) => {
+      const items = await getConversations(view);
+      const sorted = [...items].sort((a, b) => {
+        const ta = new Date(a.timestamp || 0).getTime();
+        const tb = new Date(b.timestamp || 0).getTime();
+        return tb - ta;
+      });
+      setSessions(sorted);
+    },
+    [sessionView]
+  );
+
   useEffect(() => {
     if (isAuthenticated && isConnected) {
       reauthenticate();
@@ -134,13 +175,7 @@ export default function Chatbot() {
     const fetchSessions = async () => {
       try {
         setLoadingSessions(true);
-        const items = await getConversations();
-        const sorted = [...items].sort((a, b) => {
-          const ta = new Date(a.timestamp || 0).getTime();
-          const tb = new Date(b.timestamp || 0).getTime();
-          return tb - ta;
-        });
-        setSessions(sorted);
+        await refreshSessions(sessionView);
       } catch {
         setChatError('No se pudo cargar el historial de sesiones.');
       } finally {
@@ -149,7 +184,7 @@ export default function Chatbot() {
     };
 
     if (isAuthenticated) fetchSessions();
-  }, [isAuthenticated]);
+  }, [isAuthenticated, sessionView, refreshSessions]);
 
   useEffect(() => {
     if (socketMessages.length === 0) return;
@@ -187,6 +222,7 @@ export default function Chatbot() {
 
     if (payload.conversation_id && payload.conversation_id !== activeConversationId) {
       setActiveConversationId(payload.conversation_id);
+      setActiveConversationStatus('active');
       setSessions((prev) => {
         const exists = prev.some((item) => item._id === payload.conversation_id);
         if (exists) return prev;
@@ -195,6 +231,7 @@ export default function Chatbot() {
             _id: payload.conversation_id,
             timestamp: new Date().toISOString(),
             triaje_level: payload.triaje_level,
+            lifecycle_status: 'active',
             messages: [
               { role: 'user', content: payload.user_message || '' },
               { role: 'assistant', content: responseText },
@@ -235,8 +272,16 @@ export default function Chatbot() {
       setPendingMessageId(null);
     }
     setIsWaitingBot(false);
-    setChatError(socketError);
-  }, [socketError, pendingMessageId]);
+
+    if (socketError.includes('conversation_archived')) {
+      setChatError('Esta conversación está archivada. Recupérala para enviar mensajes.');
+      if (activeConversationId) {
+        setActiveConversationStatus('archived');
+      }
+    } else {
+      setChatError(socketError);
+    }
+  }, [socketError, pendingMessageId, activeConversationId]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -265,8 +310,11 @@ export default function Chatbot() {
     });
   }, [sessions, searchTerm]);
 
+  const isArchivedConversation = activeConversationStatus === 'archived';
+
   const startNewConversation = () => {
     setActiveConversationId(null);
+    setActiveConversationStatus('active');
     setMessages([]);
     setChatError(null);
     setActiveTriageLevel('');
@@ -283,6 +331,7 @@ export default function Chatbot() {
         return;
       }
       setActiveConversationId(conversationId);
+      setActiveConversationStatus(normalizeLifecycleStatus(detail));
       setMessages(mapConversationMessages(detail));
       setActiveTriageLevel(detail.triaje_level || '');
       setQuickReplies(FALLBACK_QUICK_REPLIES);
@@ -292,9 +341,75 @@ export default function Chatbot() {
     }
   };
 
+  const handleArchiveConversation = async (conversationId: string) => {
+    try {
+      setSessionActionBusy(`${conversationId}:archive`);
+      setChatError(null);
+      await archiveConversation(conversationId);
+      if (activeConversationId === conversationId) {
+        setActiveConversationStatus('archived');
+        setSessionView('archived');
+      }
+      await refreshSessions(activeConversationId === conversationId ? 'archived' : sessionView);
+    } catch {
+      setChatError('No se pudo archivar la conversación.');
+    } finally {
+      setSessionActionBusy(null);
+    }
+  };
+
+  const handleRecoverConversation = async (conversationId: string) => {
+    try {
+      setSessionActionBusy(`${conversationId}:recover`);
+      setChatError(null);
+      await recoverConversation(conversationId);
+      if (activeConversationId === conversationId) {
+        setActiveConversationStatus('active');
+        setSessionView('active');
+      }
+      await refreshSessions(activeConversationId === conversationId ? 'active' : sessionView);
+    } catch {
+      setChatError('No se pudo recuperar la conversación.');
+    } finally {
+      setSessionActionBusy(null);
+    }
+  };
+
+  const handleDeleteConversation = async (conversationId: string) => {
+    if (!window.confirm('¿Eliminar esta sesión? Se ocultará y se conservará por 30 días.')) return;
+    try {
+      setSessionActionBusy(`${conversationId}:delete`);
+      setChatError(null);
+      await deleteConversation(conversationId);
+      if (activeConversationId === conversationId) {
+        startNewConversation();
+      }
+      await refreshSessions(sessionView);
+    } catch {
+      setChatError('No se pudo eliminar la conversación.');
+    } finally {
+      setSessionActionBusy(null);
+    }
+  };
+
+  const handleDeleteAll = async () => {
+    if (!window.confirm('¿Eliminar todas las sesiones visibles? Se ocultarán y se conservarán por 30 días.')) return;
+    try {
+      setBulkActionBusy(true);
+      setChatError(null);
+      await deleteAllConversations();
+      startNewConversation();
+      await refreshSessions(sessionView);
+    } catch {
+      setChatError('No se pudieron eliminar todas las sesiones.');
+    } finally {
+      setBulkActionBusy(false);
+    }
+  };
+
   const submitMessage = () => {
     const trimmed = input.trim();
-    if (!trimmed || !isConnected) return;
+    if (!trimmed || !isConnected || isArchivedConversation) return;
 
     const userMessageId = createMessageId();
     const userMessage: Message = {
@@ -361,6 +476,7 @@ export default function Chatbot() {
   };
 
   const applySuggestion = (suggestion: string) => {
+    if (isArchivedConversation) return;
     setInput(suggestion);
     setInputRows(Math.min(5, Math.max(1, suggestion.split('\n').length)));
   };
@@ -370,11 +486,27 @@ export default function Chatbot() {
       <aside className="border-r border-border/70 bg-card/80 flex flex-col min-h-0">
         <div className="p-4 border-b border-border/70">
           <h3 className="text-2xl font-semibold tracking-tight">Sesiones</h3>
+          <div className="mt-3 flex gap-2">
+            <Button
+              size="sm"
+              variant={sessionView === 'active' ? 'default' : 'outline'}
+              onClick={() => setSessionView('active')}
+            >
+              Activas
+            </Button>
+            <Button
+              size="sm"
+              variant={sessionView === 'archived' ? 'default' : 'outline'}
+              onClick={() => setSessionView('archived')}
+            >
+              Archivadas
+            </Button>
+          </div>
           <div className="mt-3 relative">
             <TbSearch className="h-4 w-4 text-muted-foreground absolute left-3 top-1/2 -translate-y-1/2" />
             <input
               className="w-full rounded-xl border border-input bg-background py-2 pl-9 pr-3 text-sm outline-none focus:ring-2 focus:ring-ring"
-              placeholder="Buscar sesión..."
+              placeholder={`Buscar sesión ${sessionView === 'active' ? 'activa' : 'archivada'}...`}
               value={searchTerm}
               onChange={(event) => setSearchTerm(event.target.value)}
             />
@@ -386,36 +518,71 @@ export default function Chatbot() {
             <div className="text-sm text-muted-foreground px-2 py-3">Cargando sesiones...</div>
           ) : filteredSessions.length === 0 ? (
             <div className="rounded-xl border border-border/60 bg-background p-4">
-              <p className="font-medium">Sin sesiones previas</p>
+              <p className="font-medium">{sessionView === 'active' ? 'Sin sesiones activas' : 'Sin sesiones archivadas'}</p>
               <p className="text-sm text-muted-foreground mt-1">
-                Cuando completes un triaje, aparecerá aquí en tu historial.
+                {sessionView === 'active'
+                  ? 'Cuando completes un triaje, aparecerá aquí.'
+                  : 'Archiva una sesión activa para verla aquí.'}
               </p>
             </div>
           ) : (
-            filteredSessions.map((session) => (
-              <button
-                key={session._id}
-                className={`w-full rounded-xl border p-3 text-left transition ${
-                  activeConversationId === session._id
-                    ? 'border-blue-300 bg-blue-100/70 dark:border-blue-700 dark:bg-blue-950/30'
-                    : 'border-border/60 bg-background hover:bg-muted/40 dark:hover:bg-muted/60'
-                }`}
-                onClick={() => selectConversation(session._id)}
-              >
-                <div className="flex items-center justify-between gap-2">
-                  <p className="font-semibold truncate">{sessionTitle(session)}</p>
-                  <span className="text-xs text-muted-foreground shrink-0">{relativeDate(session.timestamp)}</span>
+            filteredSessions.map((session) => {
+              const lifecycle = normalizeLifecycleStatus(session);
+              const isBusyArchive = sessionActionBusy === `${session._id}:archive`;
+              const isBusyRecover = sessionActionBusy === `${session._id}:recover`;
+              const isBusyDelete = sessionActionBusy === `${session._id}:delete`;
+              return (
+                <div
+                  key={session._id}
+                  className={`w-full rounded-xl border p-3 text-left transition ${
+                    activeConversationId === session._id
+                      ? 'border-blue-300 bg-blue-100/70 dark:border-blue-700 dark:bg-blue-950/30'
+                      : 'border-border/60 bg-background hover:bg-muted/40 dark:hover:bg-muted/60'
+                  }`}
+                >
+                  <button className="w-full text-left" onClick={() => selectConversation(session._id)}>
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="font-semibold truncate">{sessionTitle(session)}</p>
+                      <span className="text-xs text-muted-foreground shrink-0">{relativeDate(session.timestamp)}</span>
+                    </div>
+                    <p className="text-sm text-muted-foreground truncate mt-1">{sessionPreview(session)}</p>
+                    <p className="text-xs mt-2 font-medium text-blue-700 dark:text-blue-300">
+                      {session.triaje_level || 'Sin clasificación'}
+                      {lifecycle === 'archived' ? ' · Archivada' : ''}
+                    </p>
+                  </button>
+                  <div className="mt-3 flex items-center gap-2">
+                    {lifecycle === 'active' ? (
+                      <Button size="sm" variant="outline" onClick={() => handleArchiveConversation(session._id)} disabled={isBusyArchive}>
+                        <TbArchive className="h-4 w-4" />
+                        Archivar
+                      </Button>
+                    ) : (
+                      <Button size="sm" variant="outline" onClick={() => handleRecoverConversation(session._id)} disabled={isBusyRecover}>
+                        <TbRestore className="h-4 w-4" />
+                        Recuperar
+                      </Button>
+                    )}
+                    <Button size="sm" variant="danger" onClick={() => handleDeleteConversation(session._id)} disabled={isBusyDelete}>
+                      <TbTrash className="h-4 w-4" />
+                      Eliminar
+                    </Button>
+                  </div>
                 </div>
-                <p className="text-sm text-muted-foreground truncate mt-1">{sessionPreview(session)}</p>
-                <p className="text-xs mt-2 font-medium text-blue-700 dark:text-blue-300">{session.triaje_level || 'Sin clasificación'}</p>
-              </button>
-            ))
+              );
+            })
           )}
         </div>
 
-        <div className="p-3 border-t border-border/70">
-          <Button className="w-full" onClick={startNewConversation}>
-            + Nueva sesión
+        <div className="p-3 border-t border-border/70 space-y-2">
+          {sessionView === 'active' && (
+            <Button className="w-full" onClick={startNewConversation}>
+              + Nueva sesión
+            </Button>
+          )}
+          <Button className="w-full" variant="danger" onClick={handleDeleteAll} disabled={bulkActionBusy}>
+            <TbTrash className="h-4 w-4" />
+            Eliminar todas
           </Button>
         </div>
       </aside>
@@ -436,6 +603,11 @@ export default function Chatbot() {
             <span className={`text-xs font-semibold rounded-full px-3 py-1 border ${triageBadgeClass(activeTriageLevel)}`}>
               {activeTriageLevel || 'Sin clasificación'}
             </span>
+            {isArchivedConversation && (
+              <span className="text-xs font-semibold rounded-full px-3 py-1 border border-amber-300 bg-amber-100 text-amber-900 dark:bg-amber-900/30 dark:text-amber-200 dark:border-amber-700">
+                Archivada
+              </span>
+            )}
             <Button variant="outline" size="icon" aria-label="Resumen">
               <TbFileDescription className="h-4 w-4" />
             </Button>
@@ -449,6 +621,19 @@ export default function Chatbot() {
         </div>
 
         <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-4 bg-muted/30 dark:bg-slate-900/20" aria-live="polite">
+          {isArchivedConversation && activeConversationId && (
+            <div className="rounded-xl border border-amber-300 bg-amber-50 text-amber-900 dark:bg-amber-900/25 dark:border-amber-700 dark:text-amber-100 p-4 flex items-center justify-between gap-3">
+              <div className="text-sm flex items-center gap-2">
+                <TbLock className="h-4 w-4" />
+                Esta conversación está archivada. El envío de mensajes está desactivado.
+              </div>
+              <Button size="sm" onClick={() => handleRecoverConversation(activeConversationId)}>
+                <TbRestore className="h-4 w-4" />
+                Recuperar conversación
+              </Button>
+            </div>
+          )}
+
           {messages.length === 0 && !isWaitingBot && !chatError && (
             <div className="h-full flex items-center justify-center">
               <div className="max-w-md text-center rounded-2xl border border-border/70 bg-card p-6">
@@ -520,18 +705,20 @@ export default function Chatbot() {
         </div>
 
         <div className="border-t border-border/70 bg-card px-4 py-3 space-y-3">
-          <div className="flex flex-wrap gap-2">
-            {quickReplies.map((item) => (
-              <button
-                key={item}
-                type="button"
-                className="rounded-full border border-input bg-background px-3 py-1.5 text-sm text-foreground hover:bg-muted transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                onClick={() => applySuggestion(item)}
-              >
-                {item}
-              </button>
-            ))}
-          </div>
+          {!isArchivedConversation && (
+            <div className="flex flex-wrap gap-2">
+              {quickReplies.map((item) => (
+                <button
+                  key={item}
+                  type="button"
+                  className="rounded-full border border-input bg-background px-3 py-1.5 text-sm text-foreground hover:bg-muted transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  onClick={() => applySuggestion(item)}
+                >
+                  {item}
+                </button>
+              ))}
+            </div>
+          )}
 
           <form onSubmit={handleSendMessage} className="w-full flex items-end gap-2">
             <Textarea
@@ -540,27 +727,29 @@ export default function Chatbot() {
               onKeyDown={handleComposerKeyDown}
               rows={inputRows}
               placeholder={
-                isConnected
-                  ? 'Escribe tu mensaje aquí...'
-                  : isConnecting
-                    ? 'Conectando...'
-                    : 'Sin conexión con el servidor'
+                isArchivedConversation
+                  ? 'Esta conversación está archivada'
+                  : isConnected
+                    ? 'Escribe tu mensaje aquí...'
+                    : isConnecting
+                      ? 'Conectando...'
+                      : 'Sin conexión con el servidor'
               }
               className="min-h-[44px] max-h-36 resize-none bg-background/95"
-              disabled={!isConnected || isWaitingBot}
+              disabled={!isConnected || isWaitingBot || isArchivedConversation}
               aria-label="Mensaje para el asistente"
             />
             <div className="flex items-center gap-1">
-              <Button type="button" size="icon" variant="ghost" aria-label="Adjuntar archivo">
+              <Button type="button" size="icon" variant="ghost" aria-label="Adjuntar archivo" disabled={isArchivedConversation}>
                 <TbPaperclip className="h-5 w-5" />
               </Button>
-              <Button type="button" size="icon" variant="ghost" aria-label="Dictado de voz">
+              <Button type="button" size="icon" variant="ghost" aria-label="Dictado de voz" disabled={isArchivedConversation}>
                 <TbMicrophone className="h-5 w-5" />
               </Button>
               <Button
                 type="submit"
                 size="icon"
-                disabled={!isConnected || !input.trim() || isWaitingBot}
+                disabled={!isConnected || !input.trim() || isWaitingBot || isArchivedConversation}
                 title={!isConnected ? 'No conectado al servidor' : 'Enviar mensaje'}
                 aria-label="Enviar mensaje"
               >

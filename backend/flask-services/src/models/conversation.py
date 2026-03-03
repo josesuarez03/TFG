@@ -1,23 +1,63 @@
 import json
 import logging
-from datetime import datetime
+from datetime import datetime, timedelta
 import uuid
 from bson import Binary
 from bson.binary import UuidRepresentation
+from pymongo import ASCENDING, DESCENDING
 from data.connect import mongo_db, redis_client
 
 # Configurar logger
 logger = logging.getLogger(__name__)
+
+LIFECYCLE_ACTIVE = "active"
+LIFECYCLE_ARCHIVED = "archived"
+LIFECYCLE_DELETED = "deleted"
+LIFECYCLE_ALLOWED = {LIFECYCLE_ACTIVE, LIFECYCLE_ARCHIVED, LIFECYCLE_DELETED}
+SOFT_DELETE_RETENTION_DAYS = 30
 
 class ConversationalDatasetManager:
     
     def __init__(self):
         try:
             self.collection = mongo_db['conversations']
+            self._ensure_indexes()
             logger.info("ConversationalDatasetManager inicializado correctamente")
         except Exception as e:
             logger.error(f"Error al inicializar ConversationalDatasetManager: {str(e)}")
             raise
+
+    def _ensure_indexes(self):
+        self.collection.create_index([("user_id", ASCENDING), ("lifecycle_status", ASCENDING), ("timestamp", DESCENDING)])
+        self.collection.create_index([("purge_after", ASCENDING)], expireAfterSeconds=0)
+
+    def _normalize_lifecycle_status(self, conversation):
+        if not isinstance(conversation, dict):
+            return LIFECYCLE_ACTIVE
+        raw = str(conversation.get("lifecycle_status") or "").strip().lower()
+        if raw in LIFECYCLE_ALLOWED:
+            return raw
+        if conversation.get("active") is False:
+            return LIFECYCLE_ARCHIVED
+        return LIFECYCLE_ACTIVE
+
+    def _apply_lifecycle_backfill(self, conversation):
+        if not isinstance(conversation, dict):
+            return conversation
+        lifecycle_status = self._normalize_lifecycle_status(conversation)
+        conversation["lifecycle_status"] = lifecycle_status
+        conversation["active"] = lifecycle_status == LIFECYCLE_ACTIVE
+        conversation.setdefault("archived_at", None)
+        conversation.setdefault("deleted_at", None)
+        conversation.setdefault("purge_after", None)
+        return conversation
+
+    def _serialize_conversation_record(self, conversation):
+        if not isinstance(conversation, dict):
+            return conversation
+        if "_id" in conversation and isinstance(conversation["_id"], Binary):
+            conversation["_id"] = self._binary_to_uuid(conversation["_id"])
+        return self._apply_lifecycle_backfill(conversation)
 
     def _uuid_to_binary(self, uuid_obj):
         """Convierte un UUID a Binary para MongoDB"""
@@ -34,6 +74,7 @@ class ConversationalDatasetManager:
     def add_conversation(self, user_id, medical_context, messages, symptoms, symptoms_pattern, pain_scale, triaje_level):
         try:
             conversation_id = str(uuid.uuid4())
+            now = datetime.now()
             conversation = {
                 "user_id": user_id,
                 "_id": self._uuid_to_binary(conversation_id),
@@ -43,8 +84,12 @@ class ConversationalDatasetManager:
                 "triaje_level": triaje_level,
                 "medical_context": medical_context,
                 "messages": messages,
-                "timestamp": datetime.now(),
-                "active": True
+                "timestamp": now,
+                "active": True,
+                "lifecycle_status": LIFECYCLE_ACTIVE,
+                "archived_at": None,
+                "deleted_at": None,
+                "purge_after": None,
             }
             self.collection.insert_one(conversation)
             logger.info(f"Conversación {conversation_id} agregada a MongoDB para el usuario {user_id}")
@@ -62,27 +107,40 @@ class ConversationalDatasetManager:
             logger.error(f"Error al agregar conversación: {str(e)}")
             raise
 
-    def get_conversations(self, user_id):
+    def get_conversations(self, user_id, view="active"):
         try:
-            conversations = self.collection.find({"user_id": user_id})
+            selected_view = str(view or "active").strip().lower()
+            if selected_view not in {"active", "archived", "all"}:
+                selected_view = "active"
+
+            base_query = {"user_id": user_id, "$or": [{"lifecycle_status": {"$exists": False}}, {"lifecycle_status": {"$ne": LIFECYCLE_DELETED}}]}
+            if selected_view == "active":
+                query = {"$and": [base_query, {"$or": [{"lifecycle_status": LIFECYCLE_ACTIVE}, {"lifecycle_status": {"$exists": False}, "active": {"$ne": False}}]}]}
+            elif selected_view == "archived":
+                query = {"$and": [base_query, {"$or": [{"lifecycle_status": LIFECYCLE_ARCHIVED}, {"lifecycle_status": {"$exists": False}, "active": False}]}]}
+            else:
+                query = base_query
+
+            conversations = self.collection.find(query).sort("timestamp", DESCENDING)
             result = []
             for conv in conversations:
-                # Convertir Binary UUID de vuelta a string
-                if "_id" in conv and isinstance(conv["_id"], Binary):
-                    conv["_id"] = self._binary_to_uuid(conv["_id"])
-                result.append(conv)
+                result.append(self._serialize_conversation_record(conv))
             logger.info(f"Recuperadas {len(result)} conversaciones de MongoDB para el usuario {user_id}")
             return result
         except Exception as e:
             logger.error(f"Error al obtener conversaciones para el usuario {user_id}: {str(e)}")
             raise
 
-    def get_conversation(self, user_id, conversation_id):
+    def get_conversation(self, user_id, conversation_id, include_deleted=False):
         try:
             # Primero intentar obtener de Redis
             try:
                 cached_conversation = RedisCacheManager.obtener_conversacion(user_id, conversation_id)
                 if cached_conversation:
+                    cached_conversation = self._apply_lifecycle_backfill(cached_conversation)
+                    lifecycle_status = self._normalize_lifecycle_status(cached_conversation)
+                    if lifecycle_status == LIFECYCLE_DELETED and not include_deleted:
+                        return None
                     logger.info(f"Conversación {conversation_id} recuperada de Redis para el usuario {user_id}")
                     return cached_conversation
             except Exception as redis_error:
@@ -91,9 +149,10 @@ class ConversationalDatasetManager:
             # Si no está en cache, buscar en MongoDB
             conversation = self.collection.find_one({"user_id": user_id, "_id": self._uuid_to_binary(conversation_id)})
             if conversation:
-                # Convertir Binary UUID de vuelta a string
-                if "_id" in conversation and isinstance(conversation["_id"], Binary):
-                    conversation["_id"] = self._binary_to_uuid(conversation["_id"])
+                conversation = self._serialize_conversation_record(conversation)
+                lifecycle_status = self._normalize_lifecycle_status(conversation)
+                if lifecycle_status == LIFECYCLE_DELETED and not include_deleted:
+                    return None
                 logger.info(f"Conversación {conversation_id} recuperada de MongoDB para el usuario {user_id}")
             else:
                 logger.info(f"Conversación {conversation_id} no encontrada para el usuario {user_id}")
@@ -121,7 +180,11 @@ class ConversationalDatasetManager:
                 update_data["medical_context"] = medical_context
                 
             result = self.collection.update_one(
-                {"user_id": user_id, "_id": self._uuid_to_binary(conversation_id)},
+                {
+                    "user_id": user_id,
+                    "_id": self._uuid_to_binary(conversation_id),
+                    "$or": [{"lifecycle_status": {"$exists": False}}, {"lifecycle_status": {"$ne": LIFECYCLE_DELETED}}],
+                },
                 {"$set": update_data}
             )
             
@@ -217,60 +280,121 @@ class ConversationalDatasetManager:
             )
             raise
 
-    def mark_conversation_inactive(self, user_id, conversation_id):
+    def archive_conversation(self, user_id, conversation_id):
         try:
+            now = datetime.now()
             result = self.collection.update_one(
-                {"user_id": user_id, "_id": self._uuid_to_binary(conversation_id)},
-                {"$set": {"active": False}}
+                {
+                    "user_id": user_id,
+                    "_id": self._uuid_to_binary(conversation_id),
+                    "$or": [
+                        {"lifecycle_status": LIFECYCLE_ACTIVE},
+                        {"lifecycle_status": {"$exists": False}, "active": {"$ne": False}},
+                    ],
+                },
+                {
+                    "$set": {
+                        "lifecycle_status": LIFECYCLE_ARCHIVED,
+                        "archived_at": now,
+                        "deleted_at": None,
+                        "purge_after": None,
+                        "active": False,
+                        "timestamp": now,
+                    }
+                },
             )
-            
-            logger.info(f"Conversación {conversation_id} marcada como inactiva en MongoDB para el usuario {user_id}")
-            
-            # Eliminar de Redis
-            try:
+            if result.modified_count:
                 RedisCacheManager.eliminar_conversacion(user_id, conversation_id)
-                logger.info(f"Conversación {conversation_id} eliminada de Redis para el usuario {user_id}")
-            except Exception as redis_error:
-                logger.warning(f"Error al eliminar de Redis: {str(redis_error)}")
-            
             return result.modified_count
         except Exception as e:
-            logger.error(f"Error al marcar conversación {conversation_id} como inactiva para el usuario {user_id}: {str(e)}")
+            logger.error(f"Error al archivar conversación {conversation_id} para el usuario {user_id}: {str(e)}")
             raise
+
+    def recover_conversation(self, user_id, conversation_id):
+        try:
+            now = datetime.now()
+            result = self.collection.update_one(
+                {
+                    "user_id": user_id,
+                    "_id": self._uuid_to_binary(conversation_id),
+                    "lifecycle_status": LIFECYCLE_ARCHIVED,
+                },
+                {
+                    "$set": {
+                        "lifecycle_status": LIFECYCLE_ACTIVE,
+                        "archived_at": None,
+                        "deleted_at": None,
+                        "purge_after": None,
+                        "active": True,
+                        "timestamp": now,
+                    }
+                },
+            )
+            return result.modified_count
+        except Exception as e:
+            logger.error(f"Error al recuperar conversación {conversation_id} para el usuario {user_id}: {str(e)}")
+            raise
+
+    def soft_delete_conversation(self, user_id, conversation_id):
+        try:
+            now = datetime.now()
+            purge_after = now + timedelta(days=SOFT_DELETE_RETENTION_DAYS)
+            result = self.collection.update_one(
+                {
+                    "user_id": user_id,
+                    "_id": self._uuid_to_binary(conversation_id),
+                    "$or": [{"lifecycle_status": {"$exists": False}}, {"lifecycle_status": {"$ne": LIFECYCLE_DELETED}}],
+                },
+                {
+                    "$set": {
+                        "lifecycle_status": LIFECYCLE_DELETED,
+                        "deleted_at": now,
+                        "purge_after": purge_after,
+                        "active": False,
+                        "timestamp": now,
+                    }
+                },
+            )
+            if result.modified_count:
+                RedisCacheManager.eliminar_conversacion(user_id, conversation_id)
+            return result.modified_count
+        except Exception as e:
+            logger.error(f"Error al hacer soft-delete de conversación {conversation_id} para el usuario {user_id}: {str(e)}")
+            raise
+
+    def soft_delete_all_conversations(self, user_id):
+        try:
+            now = datetime.now()
+            purge_after = now + timedelta(days=SOFT_DELETE_RETENTION_DAYS)
+            result = self.collection.update_many(
+                {
+                    "user_id": user_id,
+                    "$or": [{"lifecycle_status": {"$exists": False}}, {"lifecycle_status": {"$ne": LIFECYCLE_DELETED}}],
+                },
+                {
+                    "$set": {
+                        "lifecycle_status": LIFECYCLE_DELETED,
+                        "deleted_at": now,
+                        "purge_after": purge_after,
+                        "active": False,
+                        "timestamp": now,
+                    }
+                },
+            )
+            RedisCacheManager.eliminar_todas_conversaciones(user_id)
+            return result.modified_count
+        except Exception as e:
+            logger.error(f"Error al hacer soft-delete masivo para el usuario {user_id}: {str(e)}")
+            raise
+
+    def mark_conversation_inactive(self, user_id, conversation_id):
+        return self.archive_conversation(user_id, conversation_id)
 
     def delete_conversation(self, user_id, conversation_id):
-        try:
-            # Eliminar de Redis primero
-            try:
-                RedisCacheManager.eliminar_conversacion(user_id, conversation_id)
-                logger.info(f"Conversación {conversation_id} eliminada de Redis para el usuario {user_id}")
-            except Exception as redis_error:
-                logger.warning(f"Error al eliminar de Redis: {str(redis_error)}")
-            
-            # Luego eliminar de MongoDB
-            result = self.collection.delete_one({"user_id": user_id, "_id": self._uuid_to_binary(conversation_id)})
-            logger.info(f"Conversación {conversation_id} eliminada de MongoDB para el usuario {user_id}, elementos eliminados: {result.deleted_count}")
-            return result.deleted_count
-        except Exception as e:
-            logger.error(f"Error al eliminar conversación {conversation_id} para el usuario {user_id}: {str(e)}")
-            raise
+        return self.soft_delete_conversation(user_id, conversation_id)
 
     def delete_all_conversations(self, user_id):
-        try:
-            # Eliminar todas las conversaciones de Redis para este usuario
-            try:
-                RedisCacheManager.eliminar_todas_conversaciones(user_id)
-                logger.info(f"Todas las conversaciones eliminadas de Redis para el usuario {user_id}")
-            except Exception as redis_error:
-                logger.warning(f"Error al eliminar todas las conversaciones de Redis: {str(redis_error)}")
-            
-            # Luego eliminar de MongoDB
-            result = self.collection.delete_many({"user_id": user_id})
-            logger.info(f"Todas las conversaciones eliminadas de MongoDB para el usuario {user_id}, elementos eliminados: {result.deleted_count}")
-            return result.deleted_count
-        except Exception as e:
-            logger.error(f"Error al eliminar todas las conversaciones para el usuario {user_id}: {str(e)}")
-            raise
+        return self.soft_delete_all_conversations(user_id)
     
     def sync_from_redis_to_mongo(self, user_id, conversation_id=None):
         """Sincroniza datos de Redis a MongoDB"""
@@ -280,6 +404,7 @@ class ConversationalDatasetManager:
                 try:
                     cached_data = RedisCacheManager.obtener_conversacion(user_id, conversation_id)
                     if cached_data:
+                        cached_data = self._apply_lifecycle_backfill(cached_data)
                         # Convertir string _id a Binary UUID para MongoDB
                         if isinstance(cached_data["_id"], str):
                             cached_data["_id"] = self._uuid_to_binary(cached_data["_id"])
@@ -297,6 +422,7 @@ class ConversationalDatasetManager:
                 try:
                     all_cached = RedisCacheManager.obtener_todas_conversaciones(user_id)
                     for cached_data in all_cached:
+                        cached_data = self._apply_lifecycle_backfill(cached_data)
                         # Convertir string _id a Binary UUID para MongoDB
                         if isinstance(cached_data["_id"], str):
                             cached_data["_id"] = self._uuid_to_binary(cached_data["_id"])
@@ -330,9 +456,11 @@ class RedisCacheManager:
     
     @staticmethod
     def guardar_conversacion(user_id, conversation_id, medical_context, messages, symptoms, 
-                           symptoms_pattern, pain_scale, triaje_level):
+                           symptoms_pattern, pain_scale, triaje_level,
+                           lifecycle_status=LIFECYCLE_ACTIVE, archived_at=None, deleted_at=None, purge_after=None):
         """Guarda una conversación en Redis con expiración de 24 horas"""
         try:
+            normalized_status = lifecycle_status if lifecycle_status in LIFECYCLE_ALLOWED else LIFECYCLE_ACTIVE
             data = {
                 "user_id": user_id,
                 "_id": conversation_id,  # Mantener como string en Redis
@@ -343,7 +471,11 @@ class RedisCacheManager:
                 "medical_context": medical_context,
                 "messages": messages,
                 "timestamp": datetime.now().isoformat(),
-                "active": True
+                "active": normalized_status == LIFECYCLE_ACTIVE,
+                "lifecycle_status": normalized_status,
+                "archived_at": archived_at.isoformat() if isinstance(archived_at, datetime) else archived_at,
+                "deleted_at": deleted_at.isoformat() if isinstance(deleted_at, datetime) else deleted_at,
+                "purge_after": purge_after.isoformat() if isinstance(purge_after, datetime) else purge_after,
             }
             
             # Guardar la conversación con expiración

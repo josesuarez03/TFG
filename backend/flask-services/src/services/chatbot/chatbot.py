@@ -85,11 +85,9 @@ class Chatbot:
             if isinstance(context_result, dict):
                 self.context = context_result.get('context', {})
                 missing_questions = context_result.get('missing_questions', [])
-                missing_question_meta = context_result.get("missing_question_meta", [])
             else:
                 self.context = context_result
                 missing_questions = []
-                missing_question_meta = []
             
             # Add medical entities to context
             if self.entities:
@@ -110,12 +108,7 @@ class Chatbot:
                 pain_level=pain_level,
                 environment=self.context.get('environment', 'general')
             )
-            is_first_clinical_turn = self._is_first_clinical_turn()
-            question_queue = self._build_question_queue(missing_question_meta, missing_questions)
-            questions_selected = self._select_questions_for_turn(
-                question_queue=question_queue,
-                is_first_turn=is_first_clinical_turn
-            )
+            questions_selected = []
 
             prompt_context = self.context
             if self.user_id and self.conversation_id:
@@ -160,14 +153,6 @@ class Chatbot:
                         "Para avanzar sin repetirnos, dame un ejemplo breve. "
                         "Por ejemplo: 'desde hace 2 días, empeora por la noche'."
                     )
-
-            if self.triage.triage_level != 'Severo':
-                self.response = self._compose_turn_response(
-                    base_response=self.response,
-                    questions_selected=questions_selected,
-                    is_first_turn=is_first_clinical_turn,
-                    loop_guard_triggered=loop_guard_triggered,
-                )
             
             # Handle severe cases
             if self.triage.triage_level == 'Severo':
@@ -188,9 +173,9 @@ class Chatbot:
                 "missing_questions": missing_questions,
                 "analysis_type": analysis_type,
                 "conversation_state": {
-                    "missing_fields": missing_questions,
+                    "missing_fields": [],
                     "collected_fields": [k for k, v in self.context.items() if v not in (None, "", [], {})],
-                    "next_intent": "collect_missing_data" if missing_questions else "triage_recommendation",
+                    "next_intent": "triage_recommendation" if self.triage.triage_level == 'Severo' else "collect_missing_data",
                     "loop_guard_triggered": loop_guard_triggered,
                     "questions_selected": questions_selected,
                     "max_questions_per_turn": self.max_questions_per_turn
@@ -235,8 +220,8 @@ class Chatbot:
             if isinstance(value, int) and 0 <= value <= 10:
                 return value
 
-        # Keep previous behavior for truly fresh context without prior pain evidence.
-        return 2
+        # Do not assume pain intensity without explicit evidence.
+        return 0
 
     def _is_first_clinical_turn(self):
         if not self.conversation_id:

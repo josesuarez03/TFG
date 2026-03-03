@@ -3,8 +3,10 @@ import uuid
 from flask import request
 from flask_socketio import emit, join_room, leave_room
 from . import socketio
-from routes.utils import process_message_logic, conversational_dataset_manager
-from services.auth.auth import get_user_id_from_token 
+from .ws_utils import resolve_ws_leave_user_id, resolve_ws_user_id
+from services.chatbot.application.chat_turn_service import process_message_logic
+from services.chatbot.application.conversation_service import conversation_service
+from services.auth.auth import get_user_id_from_token
 from services.process_data.etl_runner import clear_inactivity_timer, enqueue_etl_run
 
 # Configurar logger
@@ -88,33 +90,21 @@ def handle_chat_message(data):
         return
 
     try:
-        user_id = None
-        auth_source = None
         token_from_payload = data.get('token')
-
-        if token_from_payload:
-            logger.debug(f"Intentando obtener user_id del token en payload de chat_message para SID {sid}.")
-            user_id = get_user_id_from_token(token_from_payload)
-            if user_id:
-                auth_source = "token_payload"
-
-        if not user_id:
-            user_id = AUTHENTICATED_USERS_BY_SID.get(sid)
-            if user_id:
-                auth_source = "socket_connect_auth"
-                logger.info(f"WebSocket (SID {sid}): Usando user_id autenticado en conexión: '{user_id}'.")
-
-        if not user_id:
-            user_id_from_data = data.get('user_id')
-            if user_id_from_data:
-                user_id = user_id_from_data
-                auth_source = "payload_user_id_fallback"
-                logger.info(f"WebSocket (SID {sid}): Token ausente/invalidado en payload. Usando user_id '{user_id}' proporcionado en el mensaje.")
-            else:
-                # Considera si se debe permitir mensajes sin user_id o token
-                user_id = f"anonymous_{sid}" 
-                auth_source = "anonymous_sid_fallback"
-                logger.warning(f"WebSocket (SID {sid}): Ni token válido ni user_id en payload. Usando user_id temporal '{user_id}'.")
+        user_id, auth_source = resolve_ws_user_id(
+            data=data,
+            sid=sid,
+            authenticated_users_by_sid=AUTHENTICATED_USERS_BY_SID,
+            allow_anonymous=True,
+        )
+        if auth_source == "token_payload":
+            logger.debug(f"WebSocket (SID {sid}): user_id obtenido desde token en payload.")
+        elif auth_source == "socket_connect_auth":
+            logger.info(f"WebSocket (SID {sid}): Usando user_id autenticado en conexión: '{user_id}'.")
+        elif auth_source == "payload_user_id_fallback":
+            logger.info(f"WebSocket (SID {sid}): Token ausente/invalidado en payload. Usando user_id '{user_id}' proporcionado en el mensaje.")
+        elif auth_source == "anonymous_sid_fallback":
+            logger.warning(f"WebSocket (SID {sid}): Ni token válido ni user_id en payload. Usando user_id temporal '{user_id}'.")
         
         logger.info(f"Usuario {user_id} identificado para chat_message de SID {sid} (source={auth_source}).")
         
@@ -179,11 +169,7 @@ def on_leave_conversation(data):
     conversation_id_encrypted = data.get('conversation_id')
     if conversation_id_encrypted:
         token_from_payload = data.get("token")
-        user_id = AUTHENTICATED_USERS_BY_SID.get(sid)
-        if not user_id and token_from_payload:
-            user_id = get_user_id_from_token(token_from_payload)
-        if not user_id:
-            user_id = data.get("user_id")
+        user_id = resolve_ws_leave_user_id(data, sid, AUTHENTICATED_USERS_BY_SID)
 
         leave_room(conversation_id_encrypted)
         ACTIVE_CONVERSATION_BY_SID.pop(sid, None)
@@ -236,24 +222,19 @@ def handle_sync_request(data):
         return
 
     try:
-        user_id = None
-        token_from_payload = data.get('token')
+        user_id, auth_source = resolve_ws_user_id(
+            data=data,
+            sid=sid,
+            authenticated_users_by_sid=AUTHENTICATED_USERS_BY_SID,
+            allow_anonymous=False,
+        )
+        if auth_source == "token_payload":
+            logger.debug(f"WebSocket (SID {sid}): user_id obtenido desde token en payload de sync.")
+        elif auth_source == "socket_connect_auth":
+            logger.info(f"WebSocket (SID {sid}): Usando user_id autenticado en conexión para sync: '{user_id}'.")
+        elif auth_source == "payload_user_id_fallback":
+            logger.info(f"WebSocket (SID {sid}): Token ausente/invalidado en sync payload. Usando user_id '{user_id}' proporcionado en el mensaje.")
 
-        if token_from_payload:
-            logger.debug(f"Intentando obtener user_id del token en payload de sync_request para SID {sid}.")
-            user_id = get_user_id_from_token(token_from_payload)
-
-        if not user_id:
-            user_id = AUTHENTICATED_USERS_BY_SID.get(sid)
-            if user_id:
-                logger.info(f"WebSocket (SID {sid}): Usando user_id autenticado en conexión para sync: '{user_id}'.")
-        
-        if not user_id:
-            user_id_from_data = data.get('user_id')
-            if user_id_from_data:
-                user_id = user_id_from_data
-                logger.info(f"WebSocket (SID {sid}): Token ausente/invalidado en sync payload. Usando user_id '{user_id}' proporcionado en el mensaje.")
-        
         if not user_id: # Aún sin user_id después de los intentos
             logger.warning(f"Autenticación requerida para sync_request fallida para SID {sid}. Ni token válido ni user_id proporcionado.")
             emit('sync_error', {"error": "Se requiere autenticación válida."}, room=sid)
@@ -264,8 +245,9 @@ def handle_sync_request(data):
         conversation_id_decrypted = data.get('conversation_id')
         
         # Asumo que sync_from_redis_to_mongo puede manejar conversation_id_decrypted siendo None (para todas las conversaciones del usuario)
-        conversational_dataset_manager.sync_from_redis_to_mongo(user_id, conversation_id_decrypted)
+        conversation_service.sync_to_mongo(user_id, conversation_id_decrypted)
         emit('sync_complete', {"success": True, "message": "Sincronización completada."}, room=sid)
     except Exception as e:
         logger.error(f"Error en sincronización WebSocket para SID {sid}: {str(e)}", exc_info=True)
         emit('sync_error', {"error": "Error en la sincronización."}, room=sid)
+

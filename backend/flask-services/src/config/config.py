@@ -39,6 +39,11 @@ class Config:
     CHAT_CONTEXT_TTL_SECONDS = int(os.getenv("CHAT_CONTEXT_TTL_SECONDS", str(60 * 60 * 24)))
     CHAT_CONTEXT_WINDOW_N = int(os.getenv("CHAT_CONTEXT_WINDOW_N", "8"))
     CHAT_CONTEXT_TOP_K = int(os.getenv("CHAT_CONTEXT_TOP_K", "5"))
+    CHAT_CONTROLLER_MODE = os.getenv("CHAT_CONTROLLER_MODE", "expert_owner_on_match")
+    CHAT_EMERGENCY_MODE = os.getenv("CHAT_EMERGENCY_MODE", "combined")
+    CHAT_FORCE_PAIN_BY_TURN = int(os.getenv("CHAT_FORCE_PAIN_BY_TURN", "2"))
+    CHAT_EXPERT_GUARD_MAX_QUESTIONS = int(os.getenv("CHAT_EXPERT_GUARD_MAX_QUESTIONS", "1"))
+    CHAT_DECISION_LOG_FLAGS = os.getenv("CHAT_DECISION_LOG_FLAGS", "true").strip().lower() in {"1", "true", "yes", "on"}
 
     # Usar la clave secreta de Django si está disponible
     JWT_SECRET =  SECRET_KEY

@@ -155,7 +155,10 @@ class ConversationContextService:
         return scored[:k]
 
     def get_global_patient_context_mongo(self, user_id: str, current_conversation_id: str | None = None, max_conversations: int = 5) -> Dict[str, Any]:
-        query = {"user_id": user_id}
+        query = {
+            "user_id": user_id,
+            "$or": [{"lifecycle_status": {"$exists": False}}, {"lifecycle_status": {"$ne": "deleted"}}],
+        }
         if current_conversation_id:
             query["_id"] = {"$ne": current_conversation_id}
 

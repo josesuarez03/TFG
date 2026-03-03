@@ -1,24 +1,13 @@
 from services.chatbot.comprehend_medical import detect_entities
 from services.chatbot.duration_utils import extract_duration_text
+from services.chatbot.pain_utils import extract_pain_scale
 import re
+
+PAIN_SCALE_QUESTION = "En una escala del 1 al 10, ¿qué tan intenso es el dolor ahora?"
 
 
 def _extract_pain_level_reported(text):
-    if not text:
-        return None
-    lowered = text.strip().lower()
-
-    # Accept direct short answers like "4" or "un 4"
-    direct = re.fullmatch(r"(?:un|una)?\s*(10|[1-9])", lowered)
-    if direct:
-        return int(direct.group(1))
-
-    # Accept answers that mention pain intensity explicitly
-    contextual = re.search(r"(?:dolor|intensidad|escala|nivel)[^\d]{0,12}(10|[1-9])", lowered)
-    if contextual:
-        return int(contextual.group(1))
-
-    return None
+    return extract_pain_scale(text)
 
 
 def _extract_symptom_duration(text):
@@ -37,6 +26,60 @@ def _extract_red_flags_answer(text):
     if has_red_flags:
         return "no" if has_negation else "sí"
     return None
+
+
+def is_pain_scale_question(text):
+    if not isinstance(text, str) or not text.strip():
+        return False
+    lowered = text.strip().lower()
+    return (
+        "escala del 1 al 10" in lowered
+        or ("intenso" in lowered and "dolor" in lowered)
+        or ("intensidad" in lowered and "dolor" in lowered)
+    )
+
+
+def has_explicit_pain_report(context):
+    if not isinstance(context, dict):
+        return False
+    value = context.get("pain_level_reported")
+    return isinstance(value, int) and 0 <= value <= 10
+
+
+def _hydrate_profile_demographics(context, user_data):
+    if not isinstance(context, dict) or not isinstance(user_data, dict):
+        return
+
+    profile = user_data.get("patient_profile", {})
+    if not isinstance(profile, dict):
+        return
+
+    if context.get("name") in (None, "", [], {}):
+        full_name = (
+            profile.get("name")
+            or profile.get("full_name")
+            or profile.get("nombre")
+            or profile.get("display_name")
+        )
+        if not full_name:
+            first_name = profile.get("first_name") or profile.get("nombre")
+            last_name = profile.get("last_name") or profile.get("apellido")
+            parts = [part for part in [first_name, last_name] if isinstance(part, str) and part.strip()]
+            if parts:
+                full_name = " ".join(parts)
+        if isinstance(full_name, str) and full_name.strip():
+            context["name"] = full_name.strip()
+
+    if context.get("sex") in (None, "", [], {}):
+        sex_value = profile.get("sex") or profile.get("gender") or profile.get("sexo")
+        if isinstance(sex_value, str) and sex_value.strip():
+            context["sex"] = sex_value.strip()
+
+    if context.get("age") in (None, "", [], {}):
+        age_value = profile.get("age") or profile.get("edad")
+        if isinstance(age_value, (int, str)) and str(age_value).strip():
+            context["age"] = age_value
+
 
 def init_context(text, user_data=None, existing_context=None):
     entities = detect_entities(text)
@@ -61,6 +104,7 @@ def init_context(text, user_data=None, existing_context=None):
     # Merge with provided user_data if available
     if user_data and isinstance(user_data, dict):
         context.update(user_data)
+    _hydrate_profile_demographics(context, user_data)
 
     # Extract entities detected from text
     if entities:
@@ -68,12 +112,15 @@ def init_context(text, user_data=None, existing_context=None):
             if isinstance(entity, dict):
                 if entity.get("Category") == "PERSONAL_IDENTIFIABLE_INFORMATION":
                     if entity.get("Type") == "NAME":
-                        context["name"] = entity.get("Text")
+                        if context.get("name") in (None, "", [], {}):
+                            context["name"] = entity.get("Text")
                 elif entity.get("Category") == "PROTECTED_HEALTH_INFORMATION":
                     if entity.get("Type") == "AGE":
-                        context["age"] = entity.get("Text")
+                        if context.get("age") in (None, "", [], {}):
+                            context["age"] = entity.get("Text")
                     elif entity.get("Type") == "GENDER":
-                        context["sex"] = entity.get("Text")
+                        if context.get("sex") in (None, "", [], {}):
+                            context["sex"] = entity.get("Text")
 
     if text and not context.get("chief_complaint"):
         context["chief_complaint"] = text.strip()
@@ -94,49 +141,9 @@ def init_context(text, user_data=None, existing_context=None):
         if red_flags:
             context["red_flags_checked"] = red_flags
 
-    # Prioridad clínica de preguntas (menor número = más prioridad)
-    missing_question_meta = []
-
-    def add_question(field, question, priority):
-        value = context.get(field)
-        if value in (None, "", [], {}):
-            missing_question_meta.append(
-                {
-                    "field": field,
-                    "question": question,
-                    "priority": priority,
-                }
-            )
-
-    # 1) Síntoma principal / evolución
-    add_question("symptom_duration", "¿Desde cuándo tienes estos síntomas?", 1)
-    # 2) Intensidad
-    add_question("pain_level_reported", "En una escala del 1 al 10, ¿qué tan intenso es el dolor ahora?", 2)
-    # 3) Red flags
-    add_question("red_flags_checked", "¿Has tenido dificultad para respirar, dolor de pecho, desmayo o fiebre muy alta?", 3)
-    # 4) Medicación / alergias / antecedentes
-    add_question("current_medications", "¿Estás tomando algún medicamento actualmente?", 4)
-    add_question("known_allergies", "¿Tienes alergias a medicamentos o alimentos?", 4)
-    add_question("medical_history_known", "¿Tienes algún antecedente médico importante?", 4)
-    # 5) Demográficos secundarios
-    add_question("name", "¿Cuál es tu nombre?", 5)
-    add_question("sex", "¿Cuál es tu sexo?", 5)
-    add_question("age", "¿Cuál es tu edad?", 5)
-    if (context.get("location") in (None, "")) and (context.get("occupation") in (None, "")):
-        missing_question_meta.append(
-            {
-                "field": "location_or_occupation",
-                "question": "¿Dónde te encuentras o cuál es tu ocupación?",
-                "priority": 5,
-            }
-        )
-
-    missing_question_meta.sort(key=lambda x: x["priority"])
-    missing_questions = [item["question"] for item in missing_question_meta]
-
     return {
         "context": context,
-        "missing_questions": missing_questions,
-        "missing_question_meta": missing_question_meta,
+        "missing_questions": [],
+        "missing_question_meta": [],
         "entities": entities
     }
