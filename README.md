@@ -193,5 +193,6 @@ Este sistema ofrece apoyo de triaje inicial y no sustituye la evaluacion clinica
 
 ## Licencia
 
-Este proyecto se distribuye bajo licencia MIT. Consulta `LICENSE`.
+Este proyecto se distribuye bajo licencia propietaria ("All rights reserved").
+Consulta `LICENSE` para condiciones de uso y autorizaciones.
 
