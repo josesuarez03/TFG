@@ -522,3 +522,5 @@ Imagen1.png
 poster.png
 pass_app_js.txt
 /images
+.venv.flask
+.venv.django
