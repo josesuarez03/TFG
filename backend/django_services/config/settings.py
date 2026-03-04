@@ -9,7 +9,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 
 SECRET_KEY = os.getenv('DJANGO_SECRET_KEY')  
 DEBUG = os.getenv('DEBUG') == 'True'
-ALLOWED_HOSTS = os.getenv('ALLOWED_HOSTS', '*').split(',')
+ALLOWED_HOSTS = [host.strip() for host in os.getenv('ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',') if host.strip()]
 
 INSTALLED_APPS = [
     'django.contrib.admin', 
@@ -61,16 +61,14 @@ MIDDLEWARE = [
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
 
-# Configura CORS explícitamente para todos los orígenes que necesitas
-CORS_ALLOW_ALL_ORIGINS = True  # En desarrollo, puedes permitir todos
+# CORS/Hosts seguros por defecto (abiertos solo en desarrollo)
+if DEBUG:
+    CORS_ALLOW_ALL_ORIGINS = True
+else:
+    CORS_ALLOW_ALL_ORIGINS = False
 
-#ALLOWED_HOSTS = ['localhost', '172.17.0.1']
-ALLOWED_HOSTS = ['*']
-
-"""CORS_ALLOWED_ORIGINS = [
-    'http://localhost:3000',
-    'http://172.17.0.1:3000',
-]"""
+    cors_origins_raw = os.getenv('CORS_ALLOWED_ORIGINS', '')
+    CORS_ALLOWED_ORIGINS = [origin.strip() for origin in cors_origins_raw.split(',') if origin.strip()]
 
 # Permitir credenciales (cookies, encabezados de autorización, etc.)
 CORS_ALLOW_CREDENTIALS = True
@@ -98,6 +96,11 @@ CSRF_TRUSTED_ORIGINS = [
     "http://localhost:3000",
     "http://172.17.0.1:3000",
 ]
+
+if not DEBUG:
+    csrf_extra_raw = os.getenv('CSRF_TRUSTED_ORIGINS', '')
+    extra_origins = [origin.strip() for origin in csrf_extra_raw.split(',') if origin.strip()]
+    CSRF_TRUSTED_ORIGINS = list(dict.fromkeys(CSRF_TRUSTED_ORIGINS + extra_origins))
 
 ROOT_URLCONF = 'config.urls'
 WSGI_APPLICATION = 'config.wsgi.application'
@@ -180,7 +183,7 @@ STATIC_URL = '/static/'
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
-CACHE = {
+CACHES = {
     'default': {
         'BACKEND': 'django.core.cache.backends.redis.RedisCache',
         'LOCATION': f"redis://{os.getenv('REDIS_HOST')}:{os.getenv('REDIS_PORT')}/{os.getenv('REDIS_DB1')}",
@@ -194,4 +197,14 @@ EMAIL_USE_TLS = True
 EMAIL_HOST_USER = os.getenv('EMAIL_HOST_USER')  # tu dirección de correo electrónico
 EMAIL_HOST_PASSWORD = os.getenv('EMAIL_HOST_PASSWORD')  # tu contraseña de correo electrónico
 
-FLASK_API_KEY = os.getenv('DJANGO_SECRET_KEY')
+FLASK_API_KEY = os.getenv('FLASK_API_KEY', os.getenv('DJANGO_SECRET_KEY', ''))
+
+if not DEBUG:
+    ALLOWED_HOSTS = [host for host in ALLOWED_HOSTS if host != '*']
+
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
+    SECURE_SSL_REDIRECT = os.getenv("SECURE_SSL_REDIRECT", "True") == "True"
+    SECURE_HSTS_SECONDS = int(os.getenv("SECURE_HSTS_SECONDS", "31536000"))
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+    SECURE_HSTS_PRELOAD = True

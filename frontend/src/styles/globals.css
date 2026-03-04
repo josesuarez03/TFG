@@ -3,9 +3,22 @@
 @tailwind utilities;
 
 @layer base {
+  body {
+    font-family: var(--font-app), "Segoe UI", sans-serif;
+    background: hsl(var(--background));
+    color: hsl(var(--foreground));
+  }
+
+  button,
+  input,
+  select,
+  textarea {
+    font: inherit;
+  }
+
   :root {
     --background: 210 25% 98%;
-    --foreground: 210 40% 98%;
+    --foreground: 210 40% 8%;
 
     --card: 0 0% 100%;
     --card-foreground: 210 40% 2%;
@@ -20,7 +33,7 @@
     --secondary-foreground: 210 40% 2%;
 
     --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
+    --muted-foreground: 215 20% 33%;
 
     --accent: 209 58% 93%;    /* Basado en un tono claro de los azules */
     --accent-foreground: 210 40% 2%;
@@ -42,33 +55,67 @@
   }
 
   .dark {
-    --background: 209 77% 20%; /* #083560 */
+    --background: 223 56% 12%;
     --foreground: 210 40% 98%;
 
-    --card: 210 40% 13%;
+    --card: 221 34% 20%;
     --card-foreground: 210 40% 98%;
 
-    --popover: 210 40% 13%;
+    --popover: 221 34% 20%;
     --popover-foreground: 210 40% 98%;
 
-    --primary: 195 89% 64%;   /* #53C4F5 */
-    --primary-foreground: 209 77% 20%; /* #083560 */
+    --primary: 224 88% 62%;
+    --primary-foreground: 223 56% 12%;
 
-    --secondary: 215 46% 60%;  /* #7097BE */
+    --secondary: 220 30% 24%;
     --secondary-foreground: 210 40% 98%;
 
-    --muted: 217 33% 30%;
-    --muted-foreground: 215 20.2% 65.1%;
+    --muted: 221 30% 24%;
+    --muted-foreground: 216 24% 75%;
 
-    --accent: 217 33% 38%;    /* #48547C */
+    --accent: 223 33% 26%;
     --accent-foreground: 210 40% 98%;
 
     --destructive: 0 62.8% 30.6%;
     --destructive-foreground: 210 40% 98%;
 
-    --border: 217 33% 25%;
-    --input: 217 33% 25%;
-    --ring: 195 89% 64%;      /* #53C4F5 */
+    --border: 223 30% 29%;
+    --input: 223 30% 29%;
+    --ring: 224 88% 62%;
+  }
+}
+
+@layer components {
+  .page-container {
+    @apply mx-auto w-full max-w-6xl px-4 py-6 md:px-6 md:py-8;
+  }
+
+  .section-header {
+    @apply mb-4 md:mb-6;
+  }
+
+  .card-elevated {
+    @apply border border-border/70 shadow-md;
+  }
+
+  .status-badge {
+    @apply inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-medium;
+  }
+
+  .surface-card {
+    @apply rounded-2xl border border-border/70 bg-card shadow-sm;
+  }
+
+  .surface-card-interactive {
+    @apply rounded-2xl border border-border/70 bg-card shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md hover:border-blue-200 focus-within:ring-2 focus-within:ring-blue-300;
+  }
+
+  .pill {
+    @apply inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold;
+  }
+
+  .section-title {
+    @apply text-xl md:text-2xl font-semibold tracking-tight;
   }
 }
 
@@ -89,7 +136,7 @@
   background-color: #7097BE;
 }
 .bg-blue-violet {
-  background-color: #48547C;
+  background-color: #1e5fa0;
 }
 
 .text-blue-primary {
@@ -108,7 +155,7 @@
   color: #7097BE;
 }
 .text-blue-violet {
-  color: #48547C;
+  color: #1e5fa0;
 }
 
 .border-blue-primary {
@@ -127,5 +174,5 @@
   border-color: #7097BE;
 }
 .border-blue-violet {
-  border-color: #48547C;
+  border-color: #1e5fa0;
 }

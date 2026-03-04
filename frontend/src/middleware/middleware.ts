@@ -14,34 +14,14 @@ export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   const authCookie = request.cookies.get('isAuthenticated')?.value?.trim();
-  const userTypeCookie = request.cookies.get('userType')?.value?.trim();
-  const profileCompletedCookie = request.cookies.get('isProfileCompleted')?.value?.trim();
-
   const isAuthenticated = authCookie === 'true';
-  const isProfileCompleted = profileCompletedCookie === 'true';
-
-  // ✅ Logs de debug
-  console.log({
-    pathname,
-    isAuthenticated,
-    isProfileCompleted,
-    userType: userTypeCookie,
-    isPublicRoute: pathMatches(pathname, ROUTES.PUBLIC),
-    isProtectedRoute: pathMatches(pathname, ROUTES.PROTECTED),
-    isDoctorRoute: pathMatches(pathname, ROUTES.DOCTOR),
-  });
 
   // Rutas importantes
   const dashboardPath = ROUTES.PROTECTED.DASHBOARD;
-  const profileCompletePath = ROUTES.PUBLIC.PROFILE_COMPLETE;
   const loginPath = ROUTES.PUBLIC.LOGIN;
-
 
   if (pathname === ROUTES.PUBLIC.ROOT_LOGIN) {
     if (isAuthenticated) {
-      if (!isProfileCompleted) {
-        return NextResponse.redirect(new URL(profileCompletePath, request.url));
-      }
       return NextResponse.redirect(new URL(dashboardPath, request.url));
     } else {
       return NextResponse.redirect(new URL(loginPath, request.url));
@@ -50,9 +30,6 @@ export function middleware(request: NextRequest) {
 
   if (pathname === loginPath) {
     if (isAuthenticated) {
-      if (!isProfileCompleted) {
-        return NextResponse.redirect(new URL(profileCompletePath, request.url));
-      }
       return NextResponse.redirect(new URL(dashboardPath, request.url));
     }
     return NextResponse.next();
@@ -66,14 +43,6 @@ export function middleware(request: NextRequest) {
     const url = new URL(loginPath, request.url);
     url.searchParams.set('from', pathname);
     return NextResponse.redirect(url);
-  }
-
-  if (isAuthenticated && pathMatches(pathname, ROUTES.DOCTOR) && userTypeCookie !== 'doctor') {
-    return NextResponse.redirect(new URL(dashboardPath, request.url));
-  }
-
-  if (isAuthenticated && !isProfileCompleted && pathname !== profileCompletePath) {
-    return NextResponse.redirect(new URL(profileCompletePath, request.url));
   }
 
   return NextResponse.next();

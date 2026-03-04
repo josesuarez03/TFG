@@ -5,6 +5,7 @@ from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from django.http import Http404
 from django.core.exceptions import PermissionDenied
+import hmac
 
 from rest_framework import status, viewsets, generics, mixins
 from rest_framework.decorators import api_view, permission_classes, action
@@ -26,7 +27,7 @@ from django.core.cache import cache
 from .serializers import (
     UserSerializer, UserProfileSerializer, UserProfileSerializerBasic,
     GoogleOAuthUserInfoSerializer, RequiredOAuthUserSerializer, 
-    PatientSerializer, DoctorSerializer, ChatbotAnalysisSerializer,
+    PatientSerializer, DoctorSerializer, PatientBasicSerializer, ChatbotAnalysisSerializer,
     PasswordResetRequestSerializer, PasswordResetVerifySerializer,
     ChangePasswordSerializer, AccountDeleteSerializer, PatientHistoryEntrySerializer,
     DoctorPatientRelationSerializer
@@ -244,12 +245,8 @@ class CompleteProfileView(generics.GenericAPIView):
                         setattr(doctor, field, serializer.validated_data[field])
                 doctor.save()
                 
-            # Verificar si el perfil está completo
-            if 'is_profile_completed' in request.data and request.data['is_profile_completed'] is True:
-                user.is_profile_completed = True
-                user.save(update_fields=['is_profile_completed'])
-            else:
-                user.check_profile_completion()
+            # Verificar si el perfil está completo según datos reales
+            user.check_profile_completion()
             
             return Response({
                 'user': UserProfileSerializer(user).data,
@@ -328,17 +325,33 @@ class PatientMedicalDataUpdateView(APIView):
     Utiliza autenticación JWT para mantener consistencia con el resto del sistema
     Permite actualizar datos tanto por servicios internos como por Flask
     """
-    permission_classes = [IsAuthenticated]
+    permission_classes = [AllowAny]
+
+    def _is_valid_integration_token(self, request):
+        integration_token = request.headers.get("X-Django-Integration-Token", "")
+        expected_token = getattr(settings, "FLASK_API_KEY", "") or ""
+        if not integration_token or not expected_token:
+            return False
+        return hmac.compare_digest(integration_token, expected_token)
     
     def post(self, request):
+        authenticated_user = request.user if request.user and request.user.is_authenticated else None
+        internal_request = self._is_valid_integration_token(request)
+
+        if not authenticated_user and not internal_request:
+            return Response(
+                {"error": "Se requiere autenticación válida (JWT o token de integración interno)."},
+                status=status.HTTP_401_UNAUTHORIZED
+            )
+
         # Obtener datos de la solicitud
         user_id = request.data.get('user_id')
         medical_data = request.data.get('medical_data', {})
         source = request.data.get('source', 'chatbot')
         
         # Si no se proporciona un user_id específico, usar el del usuario autenticado
-        if not user_id and request.user.tipo == 'patient':
-            user_id = str(request.user.id)
+        if not user_id and authenticated_user and authenticated_user.tipo == 'patient':
+            user_id = str(authenticated_user.id)
         
         if not user_id:
             return Response(
@@ -347,10 +360,15 @@ class PatientMedicalDataUpdateView(APIView):
             )
         
         # Verificar permisos - solo el propio usuario o un médico/admin puede actualizar datos
-        if str(request.user.id) != user_id and request.user.tipo not in ['doctor', 'admin', 'system']:
+        if authenticated_user and (str(authenticated_user.id) != user_id and authenticated_user.tipo not in ['doctor', 'admin']):
             return Response(
                 {"error": "No tiene permisos para actualizar los datos de este paciente"},
                 status=status.HTTP_403_FORBIDDEN
+            )
+        if internal_request and source != 'chatbot':
+            return Response(
+                {"error": "La integración interna solo permite source='chatbot'"},
+                status=status.HTTP_400_BAD_REQUEST
             )
         
         # Buscar usuario y su perfil de paciente
@@ -385,7 +403,7 @@ class PatientMedicalDataUpdateView(APIView):
         # Actualizar información del paciente con los datos validados
         updated = patient.update_from_chatbot_analysis(
             serializer.validated_data,
-            created_by=request.user
+            created_by=authenticated_user
         )
         
         if updated:
@@ -706,6 +724,76 @@ class DoctorPatientRelationViewSet(viewsets.ModelViewSet):
         elif user.tipo == 'admin':
             return DoctorPatientRelation.objects.all()
         return DoctorPatientRelation.objects.none()
+
+    def perform_create(self, serializer):
+        if self.request.user.tipo == 'doctor':
+            doctor = Doctor.objects.get(user=self.request.user)
+            serializer.save(doctor=doctor)
+            return
+        serializer.save()
+
+    def create(self, request, *args, **kwargs):
+        if request.user.tipo not in ['doctor', 'admin']:
+            return Response(
+                {"error": "No tienes permisos para crear relaciones médico-paciente"},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        if request.user.tipo == 'doctor':
+            doctor = Doctor.objects.filter(user=request.user).first()
+            if not doctor:
+                return Response(
+                    {"error": "Perfil de doctor no encontrado"},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            requested_doctor_id = request.data.get('doctor')
+            if requested_doctor_id and str(requested_doctor_id) != str(doctor.id):
+                return Response(
+                    {"error": "No puedes crear relaciones para otro doctor"},
+                    status=status.HTTP_403_FORBIDDEN
+                )
+        return super().create(request, *args, **kwargs)
+
+    def update(self, request, *args, **kwargs):
+        relation = self.get_object()
+        if request.user.tipo == 'doctor':
+            doctor = Doctor.objects.filter(user=request.user).first()
+            if not doctor or relation.doctor_id != doctor.id:
+                return Response(
+                    {"error": "No tienes permisos para modificar esta relación"},
+                    status=status.HTTP_403_FORBIDDEN
+                )
+            requested_doctor_id = request.data.get('doctor')
+            if requested_doctor_id and str(requested_doctor_id) != str(doctor.id):
+                return Response(
+                    {"error": "No puedes reasignar esta relación a otro doctor"},
+                    status=status.HTTP_403_FORBIDDEN
+                )
+        elif request.user.tipo != 'admin':
+            return Response(
+                {"error": "No tienes permisos para modificar esta relación"},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        return super().update(request, *args, **kwargs)
+
+    def partial_update(self, request, *args, **kwargs):
+        return self.update(request, *args, **kwargs)
+
+    def destroy(self, request, *args, **kwargs):
+        relation = self.get_object()
+        if request.user.tipo == 'doctor':
+            doctor = Doctor.objects.filter(user=request.user).first()
+            if not doctor or relation.doctor_id != doctor.id:
+                return Response(
+                    {"error": "No tienes permisos para eliminar esta relación"},
+                    status=status.HTTP_403_FORBIDDEN
+                )
+        elif request.user.tipo != 'admin':
+            return Response(
+                {"error": "No tienes permisos para eliminar esta relación"},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        return super().destroy(request, *args, **kwargs)
     
 
 class PasswordResetRequestView(APIView):
@@ -866,14 +954,10 @@ class AccountDeleteView(APIView):
                 status=status.HTTP_204_NO_CONTENT
             )
         
-        # Buscar la contraseña en el cuerpo de la solicitud o en los parámetros
+        # Buscar la contraseña en el cuerpo de la solicitud
         password = None
         if hasattr(request, 'data') and request.data:
             password = request.data.get('password')
-        
-        # Si no hay contraseña, verificar en los parámetros (para compatibilidad con diferentes clientes)
-        if not password and request.query_params:
-            password = request.query_params.get('password')
         
         # Para cuentas con contraseña, verificar la contraseña
         if not password:

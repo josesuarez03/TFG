@@ -1,7 +1,8 @@
 'use client';
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect } from "react";
 import Sidebar from "@/components/Sidebar";
+import Header from "@/components/Header";
 import Loading from "@/components/loading";
 import { ROUTES } from "@/routes/routePaths";
 import { useAuth } from "@/hooks/useAuth";
@@ -11,14 +12,7 @@ export default function ContentLayout({ children }: { children: React.ReactNode 
     const { isAuthenticated, loading } = useAuth();
     const pathname = usePathname();
     const router = useRouter();
-    const [isLoading, setIsLoading] = useState(true);
-
-    // Verificar si la ruta actual es pública de manera más explícita
-    const isPublicRoute = Object.values(ROUTES.PUBLIC).some(route => 
-        pathname === route || 
-        (pathname && pathname.startsWith(`${route}/`)) ||
-        (pathname && pathname.startsWith(route) && pathname.charAt(route.length) === '?')
-    );
+    const safePath = pathname || "";
 
     // Determinar si es una ruta protegida explícitamente
     const isProtectedRoute = Object.values(ROUTES.PROTECTED).some(route => 
@@ -37,33 +31,14 @@ export default function ContentLayout({ children }: { children: React.ReactNode 
     // Solo mostrar el layout completo si está autenticado Y está en una ruta protegida o de doctor
     const shouldShowFullLayout = isAuthenticated && (isProtectedRoute || isDoctorRoute);
 
-    // Debug output
-    useEffect(() => {
-        if (process.env.NODE_ENV === 'development') {
-            console.log('Layout state:', {
-                isAuthenticated,
-                pathname,
-                isPublicRoute,
-                isProtectedRoute,
-                isDoctorRoute,
-                shouldShowFullLayout
-            });
-        }
-    }, [isAuthenticated, pathname, isPublicRoute, isProtectedRoute, isDoctorRoute, shouldShowFullLayout]);
-
     // Handle navigation and auth state
     useEffect(() => {
-        // Solo proceder si no está cargando
         if (!loading) {
-            setIsLoading(false);
-            
             // Manejar redirección de la ruta raíz
             if (pathname === '/') {
                 if (isAuthenticated) {
-                    console.log('Redirigiendo de / a dashboard');
                     router.push(ROUTES.PROTECTED.DASHBOARD);
                 } else {
-                    console.log('Redirigiendo de / a login');
                     router.push(ROUTES.PUBLIC.LOGIN);
                 }
                 return;
@@ -71,28 +46,29 @@ export default function ContentLayout({ children }: { children: React.ReactNode 
           
             // Manejar acceso a rutas protegidas cuando no está autenticado
             if (!isAuthenticated && (isProtectedRoute || isDoctorRoute)) {
-                console.log('No autenticado accediendo a ruta protegida, redirigiendo a login');
-                router.push(`${ROUTES.PUBLIC.LOGIN}?from=${encodeURIComponent(pathname || '')}`);
+                router.push(`${ROUTES.PUBLIC.LOGIN}?from=${encodeURIComponent(safePath)}`);
                 return;
             }
 
         }
-    }, [isAuthenticated, isProtectedRoute, isDoctorRoute, loading, pathname, router]);
+    }, [isAuthenticated, isProtectedRoute, isDoctorRoute, loading, pathname, router, safePath]);
     
     // Mostrar componente de carga mientras se determina el estado de autenticación
-    if (loading || isLoading) {
+    if (loading) {
         return <Loading />;
     }
 
     // Layout completo para usuarios autenticados en rutas no públicas
     if (shouldShowFullLayout) {
         return (
-            <div className="flex h-screen bg-gray-50 dark:bg-gray-900">
+            <div className="flex h-screen bg-gradient-to-b from-slate-100 to-slate-50 dark:from-[#071228] dark:via-[#0B1836] dark:to-[#0E1D40]">
                 <Sidebar />
                 <div className="flex flex-col flex-1 overflow-hidden">
-
-                    <main className="flex-1 p-6 overflow-y-auto">
+                    <Header />
+                    <main className="flex-1 overflow-y-auto">
+                        <div className="page-container">
                         {children}
+                        </div>
                     </main>
                 </div>
             </div>
@@ -101,8 +77,8 @@ export default function ContentLayout({ children }: { children: React.ReactNode 
       
     // Layout simple para rutas públicas
     return (
-        <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
-            <div className="flex justify-center items-center min-h-screen">
+        <div className="min-h-screen bg-gradient-to-b from-slate-100 to-slate-50 dark:from-[#071228] dark:via-[#0B1836] dark:to-[#0E1D40]">
+            <div className="flex justify-center items-center min-h-screen px-4 py-8">
                 {children}
             </div>
         </div>

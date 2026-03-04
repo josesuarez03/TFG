@@ -1,11 +1,3 @@
-import { jwtDecode } from "jwt-decode";
-
-interface DecodedToken {
-  tipo?: string;
-  is_profile_completed?: boolean;
-  [key: string]: unknown;
-}
-
 // Event to notify subscribers when auth state changes
 const AUTH_CHANGE_EVENT = 'auth_state_changed';
 
@@ -42,33 +34,13 @@ export function syncAuthState(): void {
   
   if (accessToken) {
     isAuthenticated = true;
-    // Set authentication cookie
     document.cookie = `isAuthenticated=true; path=/; max-age=86400; samesite=lax`;
-    
-    try {
-      // Decode token to get user type and profile status
-      const decoded = jwtDecode<DecodedToken>(accessToken);
-      
-      // Set user type cookie
-      if (decoded.tipo) {
-        document.cookie = `userType=${decoded.tipo}; path=/; max-age=86400; samesite=lax`;
-      }
-      
-      // Set profile completed cookie
-      if (decoded.is_profile_completed !== undefined) {
-        document.cookie = `isProfileCompleted=${decoded.is_profile_completed}; path=/; max-age=86400; samesite=lax`;
-      }
-    } catch (e) {
-      console.error('Error decoding token:', e);
-    }
+    document.cookie = `authHint=present; path=/; max-age=86400; samesite=lax`;
   } else {
-    // Clear auth cookies if no token exists
     document.cookie = `isAuthenticated=false; path=/; max-age=0; samesite=lax`;
-    document.cookie = `userType=; path=/; max-age=0; samesite=lax`;
-    document.cookie = `isProfileCompleted=; path=/; max-age=0; samesite=lax`;
+    document.cookie = `authHint=; path=/; max-age=0; samesite=lax`;
   }
   
-  // Notify subscribers about the auth state change
   dispatchAuthChange(isAuthenticated);
 }
 
@@ -76,37 +48,15 @@ export function syncAuthState(): void {
 export function updateAuthCookies(accessToken: string): void {
   if (!accessToken) return;
   
-  // Set authentication cookie
   document.cookie = `isAuthenticated=true; path=/; max-age=86400; samesite=lax`;
-  
-  try {
-    // Decode token to get user type and profile status
-    const decoded = jwtDecode<DecodedToken>(accessToken);
-    
-    // Set user type cookie
-    if (decoded.tipo) {
-      document.cookie = `userType=${decoded.tipo}; path=/; max-age=86400; samesite=lax`;
-    }
-    
-    // Set profile completed cookie
-    if (decoded.is_profile_completed !== undefined) {
-      document.cookie = `isProfileCompleted=${decoded.is_profile_completed}; path=/; max-age=86400; samesite=lax`;
-    }
-    
-    // Notify subscribers about the auth state change
-    dispatchAuthChange(true);
-  } catch (e) {
-    console.error('Error decoding token:', e);
-  }
+  document.cookie = `authHint=present; path=/; max-age=86400; samesite=lax`;
+  dispatchAuthChange(true);
 }
 
 // Function to call when logging out
 export function clearAuthCookies(): void {
   document.cookie = `isAuthenticated=false; path=/; max-age=0; samesite=lax`;
-  document.cookie = `userType=; path=/; max-age=0; samesite=lax`;
-  document.cookie = `isProfileCompleted=; path=/; max-age=0; samesite=lax`;
-  
-  // Notify subscribers about the auth state change
+  document.cookie = `authHint=; path=/; max-age=0; samesite=lax`;
   dispatchAuthChange(false);
 }
 

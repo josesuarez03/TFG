@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   django-api-principal:
     build:
@@ -9,8 +7,11 @@ services:
     ports:
       - "8000:8000"
     depends_on:
-      - postgres
+      postgres:
+        condition: service_healthy
     restart: on-failure
+    env_file:
+      - .env
     environment:
       - IN_DOCKER=True
       - DJANGO_SECRET_KEY=${DJANGO_SECRET_KEY}
@@ -27,8 +28,6 @@ services:
       - REDIS_HOST=redis
       - REDIS_PORT=6379
       - REDIS_DB=${REDIS_DB1}
-    env_file:
-      - .env
     networks:
       - app
 
@@ -40,9 +39,13 @@ services:
     ports:
       - "5000:5000"
     depends_on:
-      - mongo
-      - redis
+      mongo:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     restart: on-failure
+    env_file:
+      - .env
     environment:
       - IN_DOCKER=True
       - MONGO_HOST=mongo
@@ -53,16 +56,21 @@ services:
       - REDIS_HOST=redis
       - REDIS_PORT=6379
       - JWT_ALGORITHM=${JWT_ALGORITHM}
-      - DJANGO_API_URL=${DJANGO_API_URL}
+      - DJANGO_API_URL=${DJANGO_API_URL_FLASK:-http://django-api-principal:8000/api}
       - SECRET_KEY=${DJANGO_SECRET_KEY}
       - AWS_REGION=${AWS_REGION}
       - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
       - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+      - CHAT_CONTROLLER_MODE=${CHAT_CONTROLLER_MODE:-llm_first_keyword_guard}
+      - CHAT_EMERGENCY_MODE=${CHAT_EMERGENCY_MODE:-combined}
+      - CHAT_FORCE_PAIN_BY_TURN=${CHAT_FORCE_PAIN_BY_TURN:-2}
+      - CHAT_EXPERT_GUARD_MAX_QUESTIONS=${CHAT_EXPERT_GUARD_MAX_QUESTIONS:-1}
+      - CHAT_DECISION_LOG_FLAGS=${CHAT_DECISION_LOG_FLAGS:-true}
     networks:
       - app
 
   postgres:
-    image: postgres:latest
+    image: postgres:16
     container_name: postgres
     environment:
       - POSTGRES_USER=${POSTGRES_USER}
@@ -86,7 +94,7 @@ services:
       - app
 
   mongo:
-    image: mongo:latest
+    image: mongo:7
     container_name: mongo
     environment:
       - MONGO_INITDB_ROOT_USERNAME=${MONGO_INITDB_ROOT_USERNAME}
@@ -98,7 +106,11 @@ services:
       - mongo_data:/data/db
     restart: on-failure
     healthcheck:
-      test: ["CMD", "mongo", "--eval", "db.adminCommand('ping')"]
+      test:
+        [
+          "CMD-SHELL",
+          "mongosh --quiet --username ${MONGO_INITDB_ROOT_USERNAME} --password ${MONGO_INITDB_ROOT_PASSWORD} --authenticationDatabase admin --eval \"db.adminCommand('ping').ok\" | grep 1",
+        ]
       interval: 10s
       retries: 5
       start_period: 30s
@@ -107,7 +119,7 @@ services:
       - app
 
   redis:
-    image: redis:latest
+    image: redis:7
     container_name: redis
     ports:
       - "6379:6379"
@@ -127,9 +139,9 @@ services:
     image: nginx:alpine
     container_name: nginx
     ports:
-      - "80:80"  # Changed to standard port 80 for HTTP
-      - "443:443"  # Changed to standard port 443 for HTTPS
-      - "443:443/udp"  # For QUIC/HTTP3 support
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
     volumes:
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
       - ./nginx/certbot/www:/var/www/certbot:ro
@@ -150,7 +162,7 @@ services:
       - ./nginx/certbot/conf:/etc/letsencrypt:rw
     networks:
       - app
-  
+
   frontend:
     build:
       context: ./frontend
@@ -164,14 +176,14 @@ services:
       - nginx
     volumes:
       - ./frontend:/app
-      - /app/node_modules  # Prevents local node_modules from overwriting container's
-      - /app/.next  # Prevents local .next folder from syncing with container
+      - /app/node_modules
+      - /app/.next
     environment:
       - CHOKIDAR_USEPOLLING=true
       - WATCHPACK_POLLING=true
       - NODE_ENV=development
-    stdin_open: true  # Equivalent to -i in docker run
-    tty: true         # Equivalent to -t in docker run
+    stdin_open: true
+    tty: true
     restart: unless-stopped
     networks:
       - app
@@ -183,7 +195,7 @@ volumes:
     driver: local
   redis_data:
     driver: local
-    
+
 networks:
   app:
     driver: bridge

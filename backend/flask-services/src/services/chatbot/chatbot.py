@@ -4,18 +4,35 @@ from services.chatbot.comprehend_medical import detect_entities
 from services.chatbot.input_validate import analyze_message, generate_response
 from services.chatbot.triaje_classification import TriageClassification
 from services.chatbot.bedrock_claude import call_claude
+from services.chatbot.conversation_context_service import ConversationContextService
+from services.chatbot.pain_utils import extract_pain_scale
 
 logging.basicConfig(level=logging.INFO)
 
 class Chatbot:
-    def __init__(self, user_input, user_data, initial_prompt=None):
+    def __init__(
+        self,
+        user_input,
+        user_data,
+        initial_prompt=None,
+        user_id=None,
+        conversation_id=None,
+        existing_context=None,
+        postgres_context=None,
+    ):
         self.user_input = user_input
         self.user_data = user_data
         self.initial_prompt = initial_prompt
+        self.user_id = user_id
+        self.conversation_id = conversation_id
+        self.existing_context = existing_context or {}
+        self.postgres_context = postgres_context or {}
         self.context = {}
         self.triage = None
         self.entities = None
         self.response = None
+        self.context_service = ConversationContextService()
+        self.max_questions_per_turn = 2
 
     def initialize_conversation(self):
         try:
@@ -46,7 +63,15 @@ class Chatbot:
                     "symptoms_pattern": "",
                     "pain_scale": 0,
                     "missing_questions": [],
-                    "analysis_type": analysis_type
+                    "analysis_type": analysis_type,
+                    "conversation_state": {
+                        "missing_fields": [],
+                        "collected_fields": list((self.user_data or {}).keys()),
+                        "next_intent": "collect_initial_symptoms",
+                        "loop_guard_triggered": False,
+                        "questions_selected": [],
+                        "max_questions_per_turn": self.max_questions_per_turn
+                    }
                 }
             
             # Detectar entidades médicas
@@ -54,7 +79,7 @@ class Chatbot:
             
             # Fix: init_context expects text, not user_data object
             # Pass the user_input as text for entity extraction
-            context_result = init_context(self.user_input)
+            context_result = init_context(self.user_input, user_data=self.user_data, existing_context=self.existing_context)
             
             # Extract context from the result
             if isinstance(context_result, dict):
@@ -63,13 +88,6 @@ class Chatbot:
             else:
                 self.context = context_result
                 missing_questions = []
-            
-            # Merge with provided user_data
-            if self.user_data:
-                self.context.update(self.user_data)
-            
-            # Add user input to context for Claude
-            self.context['user_input'] = self.user_input
             
             # Add medical entities to context
             if self.entities:
@@ -90,13 +108,51 @@ class Chatbot:
                 pain_level=pain_level,
                 environment=self.context.get('environment', 'general')
             )
+            questions_selected = []
+
+            prompt_context = self.context
+            if self.user_id and self.conversation_id:
+                prompt_context = self.context_service.build_prompt_context(
+                    user_id=self.user_id,
+                    conversation_id=self.conversation_id,
+                    user_input=self.user_input,
+                    current_context=self.context,
+                    missing_questions=missing_questions,
+                    questions_selected=questions_selected,
+                    postgres_context=self.postgres_context,
+                    triage_level=self.triage.triage_level,
+                )
+            else:
+                prompt_context = {
+                    **self.context,
+                    "user_input": self.user_input,
+                    "questions_selected": questions_selected,
+                    "postgres_context": self.postgres_context,
+                    "interaction_style": "turn_based",
+                    "max_questions_per_turn": self.max_questions_per_turn,
+                    "intro_mode": "brief_context_plus_one_question",
+                }
             
-            # Fixed: Call Claude with proper parameters
             self.response = call_claude(
-                prompt=self.context,
+                prompt=prompt_context,
                 triage_level=self.triage.triage_level,
                 initial_prompt=self.initial_prompt
             )
+
+            loop_guard_triggered = False
+            if self.user_id and self.conversation_id:
+                loop_guard_triggered = self.context_service.detect_loop(
+                    self.user_id,
+                    self.conversation_id,
+                    self.response
+                )
+                if loop_guard_triggered:
+                    if questions_selected:
+                        questions_selected = questions_selected[:1]
+                    self.response = (
+                        "Para avanzar sin repetirnos, dame un ejemplo breve. "
+                        "Por ejemplo: 'desde hace 2 días, empeora por la noche'."
+                    )
             
             # Handle severe cases
             if self.triage.triage_level == 'Severo':
@@ -115,7 +171,15 @@ class Chatbot:
                 "symptoms_pattern": symptoms_pattern,
                 "pain_scale": pain_level,
                 "missing_questions": missing_questions,
-                "analysis_type": analysis_type
+                "analysis_type": analysis_type,
+                "conversation_state": {
+                    "missing_fields": [],
+                    "collected_fields": [k for k, v in self.context.items() if v not in (None, "", [], {})],
+                    "next_intent": "triage_recommendation" if self.triage.triage_level == 'Severo' else "collect_missing_data",
+                    "loop_guard_triggered": loop_guard_triggered,
+                    "questions_selected": questions_selected,
+                    "max_questions_per_turn": self.max_questions_per_turn
+                }
             }
         
         except Exception as e:
@@ -139,26 +203,61 @@ class Chatbot:
         return symptoms
     
     def _extract_pain_level_from_context(self):
-        """Extract pain level from context or estimate from input"""
-        # Look for pain indicators in the input
-        pain_keywords = {
-            'severo': 8, 'intenso': 8, 'insoportable': 9, 'terrible': 8,
-            'moderado': 5, 'fuerte': 6, 'considerable': 5,
-            'leve': 2, 'ligero': 2, 'poco': 1, 'molesto': 3
-        }
-        
-        user_input_lower = self.user_input.lower()
-        for keyword, level in pain_keywords.items():
-            if keyword in user_input_lower:
-                return level
-        
-        # Look for numeric pain scale (1-10)
-        import re
-        pain_match = re.search(r'dolor.*?(\d+)', user_input_lower)
-        if pain_match:
-            pain_value = int(pain_match.group(1))
-            if 1 <= pain_value <= 10:
-                return pain_value
-        
-        # Default to mild pain level
-        return 2
+        """Extract pain from current message; keep previous value when no new evidence."""
+        explicit_pain = extract_pain_scale(self.user_input)
+        if explicit_pain is not None:
+            return explicit_pain
+
+        previous_candidates = [
+            self.existing_context.get("pain_level_reported"),
+            self.existing_context.get("pain_level"),
+            self.existing_context.get("pain_scale"),
+        ]
+        if isinstance(self.existing_context.get("hybrid_state"), dict):
+            previous_candidates.append(self.existing_context["hybrid_state"].get("last_pain_scale"))
+
+        for value in previous_candidates:
+            if isinstance(value, int) and 0 <= value <= 10:
+                return value
+
+        # Do not assume pain intensity without explicit evidence.
+        return 0
+
+    def _is_first_clinical_turn(self):
+        if not self.conversation_id:
+            return True
+        if not (self.user_id and self.conversation_id):
+            return False
+        recent = self.context_service.get_recent_window(self.user_id, self.conversation_id, n=1)
+        return len(recent) == 0
+
+    def _build_question_queue(self, missing_question_meta, missing_questions):
+        if missing_question_meta:
+            ordered = sorted(missing_question_meta, key=lambda item: item.get("priority", 99))
+            return [item.get("question") for item in ordered if item.get("question")]
+        return list(missing_questions or [])
+
+    def _select_questions_for_turn(self, question_queue, is_first_turn):
+        queue = list(dict.fromkeys(question_queue or []))
+        if not queue:
+            return []
+        if is_first_turn:
+            return queue[:1]
+        if len(queue) <= self.max_questions_per_turn:
+            return queue
+        return queue[:self.max_questions_per_turn]
+
+    def _compose_turn_response(self, base_response, questions_selected, is_first_turn, loop_guard_triggered):
+        if not questions_selected:
+            return base_response
+
+        if loop_guard_triggered:
+            header = "Vamos paso a paso para completar el triaje."
+        elif is_first_turn:
+            header = "Te ayudaré con unas preguntas cortas para orientarte mejor."
+        else:
+            header = "Gracias por la información. Para continuar:"
+
+        if len(questions_selected) == 1:
+            return f"{header}\n{questions_selected[0]}"
+        return f"{header}\n1. {questions_selected[0]}\n2. {questions_selected[1]}"

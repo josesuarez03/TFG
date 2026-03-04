@@ -2,33 +2,38 @@ import requests
 import logging
 import json
 import os
-from services.security.encryption import Encryption
 from config.config import Config
 
 logger = logging.getLogger(__name__)
 
-def send_data_to_django(user_id, medical_data):
+def _build_url(base_url: str, endpoint: str) -> str:
+    base = (base_url or "").strip().rstrip("/")
+    ep = endpoint.strip().lstrip("/")
+    if base.endswith("/api") and ep.startswith("api/"):
+        ep = ep[4:]
+    return f"{base}/{ep}"
+
+
+def _auth_headers(jwt_token=None):
+    headers = {"Content-Type": "application/json"}
+    if jwt_token:
+        headers["Authorization"] = f"Bearer {jwt_token}"
+    else:
+        headers["X-Django-Integration-Token"] = Config.SECRET_KEY
+    return headers
+
+
+def send_data_to_django(user_id, medical_data, jwt_token=None, base_url=None):
 
     # URL de la API de Django
-    django_api_url = os.getenv('DJANGO_API_URL')
+    django_api_url = base_url or os.getenv('DJANGO_API_URL')
 
-    endpoint = "api/patients/medical_data_update"
-    
-    # URL de la API de Django
-    django_api_url = os.getenv('DJANGO_API_URL')
-    
-    # Token JWT para autenticación
-    jwt_token = Config.JWT_SECRET_KEY
-    
-    # Construir la URL completa
-    url = f"{django_api_url}/{endpoint}"
+    endpoint = "api/patients/medical_data_update/"
+    url = _build_url(django_api_url, endpoint)
     
     try:
         # Configurar los headers con JWT para autenticación
-        headers = {
-            'Content-Type': 'application/json',
-            'Authorization': f'Bearer {jwt_token}'
-        }
+        headers = _auth_headers(jwt_token=jwt_token)
         
         # Preparar los datos para enviar
         payload = {
@@ -62,3 +67,41 @@ def send_data_to_django(user_id, medical_data):
     except Exception as e:
         logger.error(f"Error inesperado al enviar datos a Django API: {str(e)}")
         return {"error": f"Error inesperado: {str(e)}"}
+
+
+def get_patient_profile(jwt_token=None):
+    django_api_url = os.getenv("DJANGO_API_URL")
+    url = _build_url(django_api_url, "patients/me/")
+    try:
+        response = requests.get(url, headers=_auth_headers(jwt_token=jwt_token), timeout=8)
+        if response.status_code == 200:
+            return response.json()
+        logger.warning("No se pudo recuperar patient profile de Django: %s", response.status_code)
+        return {}
+    except Exception as e:
+        logger.warning("Error recuperando patient profile de Django: %s", str(e))
+        return {}
+
+
+def get_patient_history(jwt_token=None, page_size=5):
+    django_api_url = os.getenv("DJANGO_API_URL")
+    url = _build_url(django_api_url, f"patients/me/history/?page_size={page_size}")
+    try:
+        response = requests.get(url, headers=_auth_headers(jwt_token=jwt_token), timeout=8)
+        if response.status_code == 200:
+            payload = response.json()
+            return payload.get("results", payload if isinstance(payload, list) else [])
+        logger.warning("No se pudo recuperar patient history de Django: %s", response.status_code)
+        return []
+    except Exception as e:
+        logger.warning("Error recuperando patient history de Django: %s", str(e))
+        return []
+
+
+def get_patient_global_context(jwt_token=None):
+    profile = get_patient_profile(jwt_token=jwt_token)
+    history = get_patient_history(jwt_token=jwt_token, page_size=5)
+    return {
+        "profile": profile if isinstance(profile, dict) else {},
+        "history": history if isinstance(history, list) else [],
+    }
