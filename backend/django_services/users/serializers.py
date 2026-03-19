@@ -220,13 +220,13 @@ class RequiredOAuthUserSerializer(serializers.Serializer):
 
 class ChatbotAnalysisSerializer(serializers.Serializer):
     """Serializador para validar datos del análisis del chatbot"""
-    triaje_level = serializers.CharField(required=False, allow_null=True)
+    triaje_level = serializers.CharField(required=False, allow_null=True, allow_blank=True)
     pain_scale = serializers.IntegerField(required=False, allow_null=True, min_value=0, max_value=10)
-    medical_context = serializers.CharField(required=False, allow_null=True)
-    allergies = serializers.CharField(required=False, allow_null=True)
-    medications = serializers.CharField(required=False, allow_null=True)
-    medical_history = serializers.CharField(required=False, allow_null=True)
-    ocupacion = serializers.CharField(required=False, allow_null=True)
+    medical_context = serializers.CharField(required=False, allow_null=True, allow_blank=True)
+    allergies = serializers.CharField(required=False, allow_null=True, allow_blank=True)
+    medications = serializers.CharField(required=False, allow_null=True, allow_blank=True)
+    medical_history = serializers.CharField(required=False, allow_null=True, allow_blank=True)
+    ocupacion = serializers.CharField(required=False, allow_null=True, allow_blank=True)
 
 class PasswordResetRequestSerializer(serializers.Serializer):
     email = serializers.EmailField(required=True)

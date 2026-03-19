@@ -2,6 +2,9 @@ import requests
 import logging
 import json
 import os
+import hmac
+import hashlib
+import time
 from config.config import Config
 
 logger = logging.getLogger(__name__)
@@ -18,9 +21,23 @@ def _auth_headers(jwt_token=None):
     headers = {"Content-Type": "application/json"}
     if jwt_token:
         headers["Authorization"] = f"Bearer {jwt_token}"
-    else:
-        headers["X-Django-Integration-Token"] = Config.SECRET_KEY
     return headers
+
+
+def _canonical_json(payload):
+    return json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
+
+
+def _sign_internal_payload(payload, timestamp=None):
+    request_timestamp = str(timestamp or int(time.time()))
+    canonical_payload = _canonical_json(payload)
+    message = f"{request_timestamp}:{canonical_payload}".encode("utf-8")
+    signature = hmac.new(
+        Config.FLASK_API_KEY.encode("utf-8"),
+        message,
+        hashlib.sha256,
+    ).hexdigest()
+    return request_timestamp, signature
 
 
 def send_data_to_django(user_id, medical_data, jwt_token=None, base_url=None):
@@ -41,6 +58,10 @@ def send_data_to_django(user_id, medical_data, jwt_token=None, base_url=None):
             'medical_data': medical_data,
             'source': 'chatbot'
         }
+        if not jwt_token:
+            request_timestamp, signature = _sign_internal_payload(payload)
+            headers["X-Request-Timestamp"] = request_timestamp
+            headers["X-Request-Signature"] = signature
         
         # Enviar petición POST a la API de Django
         response = requests.post(

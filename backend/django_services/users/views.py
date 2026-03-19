@@ -5,7 +5,12 @@ from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from django.http import Http404
 from django.core.exceptions import PermissionDenied
+from django.core import signing
+from django.core.signing import BadSignature, SignatureExpired
 import hmac
+import hashlib
+import json
+import time
 
 from rest_framework import status, viewsets, generics, mixins
 from rest_framework.decorators import api_view, permission_classes, action
@@ -23,6 +28,7 @@ from django.core.mail import send_mail
 from django.template.loader import render_to_string
 from django.utils.crypto import get_random_string
 from django.core.cache import cache
+import logging
 
 from .serializers import (
     UserSerializer, UserProfileSerializer, UserProfileSerializerBasic,
@@ -33,11 +39,14 @@ from .serializers import (
     DoctorPatientRelationSerializer
 )
 from .models import Patient, Doctor, PatientHistoryEntry, DoctorPatientRelation
+from .throttles import LoginRateThrottle, PasswordResetRateThrottle
 
 User = get_user_model()
+logger = logging.getLogger(__name__)
 
 class LoginView(APIView):
     permission_classes = [AllowAny]
+    throttle_classes = [LoginRateThrottle]
     
     def post(self, request):
         # Obtener credenciales
@@ -90,15 +99,6 @@ class LoginView(APIView):
             status=status.HTTP_401_UNAUTHORIZED
         )
 
-    
-    # Añadir método OPTIONS para manejar solicitudes preflight explícitamente
-    def options(self, request, *args, **kwargs):
-        response = Response()
-        response["Access-Control-Allow-Origin"] = "*"  # O el origen específico del frontend
-        response["Access-Control-Allow-Methods"] = "POST, OPTIONS"
-        response["Access-Control-Allow-Headers"] = "Content-Type, Authorization"
-        return response
-
 class RegisterUserView(generics.CreateAPIView):
     queryset = User.objects.all()
     serializer_class = UserSerializer
@@ -118,14 +118,7 @@ class RegisterUserView(generics.CreateAPIView):
                 'message': 'Usuario registrado correctamente. Complete su perfil.'
             }, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-    
-    def options(self, request, *args, **kwargs):
-        response = Response()
-        response["Access-Control-Allow-Origin"] = "*"  # O el origen específico del frontend
-        response["Access-Control-Allow-Methods"] = "POST, OPTIONS"
-        response["Access-Control-Allow-Headers"] = "Content-Type, Authorization"
-        return response
-    
+
 class GoogleOAuthLoginView(APIView):
     """Vista para autenticación con Google (login o registro)"""
     permission_classes = [AllowAny]
@@ -176,14 +169,6 @@ class GoogleOAuthLoginView(APIView):
                 {"error": f"Error en autenticación con Google: {str(e)}"},
                 status=status.HTTP_400_BAD_REQUEST
             )
-    
-    def options(self, request, *args, **kwargs):
-        response = Response()
-        response["Access-Control-Allow-Origin"] = "*"  # O el origen específico del frontend
-        response["Access-Control-Allow-Methods"] = "POST, OPTIONS"
-        response["Access-Control-Allow-Headers"] = "Content-Type, Authorization"
-        return response
-
 class CompleteProfileView(generics.GenericAPIView):
     """Vista para completar información adicional después del registro/login con OAuth"""
     serializer_class = RequiredOAuthUserSerializer
@@ -327,18 +312,36 @@ class PatientMedicalDataUpdateView(APIView):
     """
     permission_classes = [AllowAny]
 
-    def _is_valid_integration_token(self, request):
-        integration_token = request.headers.get("X-Django-Integration-Token", "")
-        expected_token = getattr(settings, "FLASK_API_KEY", "") or ""
-        if not integration_token or not expected_token:
+    def _canonical_payload(self, payload):
+        return json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
+
+    def _is_valid_internal_request(self, request):
+        request_timestamp = request.headers.get("X-Request-Timestamp", "")
+        request_signature = request.headers.get("X-Request-Signature", "")
+        shared_secret = getattr(settings, "FLASK_API_KEY", "") or ""
+        if not request_timestamp or not request_signature or not shared_secret:
             return False
-        return hmac.compare_digest(integration_token, expected_token)
+        try:
+            skew = abs(int(time.time()) - int(request_timestamp))
+        except (TypeError, ValueError):
+            return False
+        if skew > 30:
+            return False
+
+        canonical_payload = self._canonical_payload(request.data)
+        expected_signature = hmac.new(
+            shared_secret.encode("utf-8"),
+            f"{request_timestamp}:{canonical_payload}".encode("utf-8"),
+            hashlib.sha256,
+        ).hexdigest()
+        return hmac.compare_digest(expected_signature, request_signature)
     
     def post(self, request):
         authenticated_user = request.user if request.user and request.user.is_authenticated else None
-        internal_request = self._is_valid_integration_token(request)
+        internal_request = self._is_valid_internal_request(request)
 
         if not authenticated_user and not internal_request:
+            logger.warning("django_internal_auth_rejected path=%s", request.path)
             return Response(
                 {"error": "Se requiere autenticación válida (JWT o token de integración interno)."},
                 status=status.HTTP_401_UNAUTHORIZED
@@ -481,11 +484,23 @@ class PatientViewSet(viewsets.ModelViewSet):
 class PatientHistoryViewSet(viewsets.ReadOnlyModelViewSet):
     """ViewSet para acceder al historial médico de un paciente"""
     serializer_class = PatientHistoryEntrySerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [AllowAny]
     pagination_class = PageNumberPagination  # Añadir paginación
+
+    def _patient_id_from_token(self):
+        token = self.request.query_params.get("token")
+        if not token:
+            return None
+        try:
+            data = signing.loads(token, salt="patient-history-access", max_age=300)
+        except (BadSignature, SignatureExpired):
+            return None
+        if data.get("action") != "read_history":
+            return None
+        return data.get("patient_id")
     
     def get_queryset(self):
-        patient_id = self.kwargs.get('patient_id')
+        patient_id = self._patient_id_from_token() or self.kwargs.get('patient_id')
         user = self.request.user
         
         # Verificar permisos
@@ -494,8 +509,12 @@ class PatientHistoryViewSet(viewsets.ReadOnlyModelViewSet):
         
         try:
             patient = Patient.objects.get(id=patient_id)
+            if self._patient_id_from_token():
+                return PatientHistoryEntry.objects.filter(patient=patient).order_by('-created_at')
             
             # Pacientes solo pueden ver su propio historial
+            if not getattr(user, "is_authenticated", False):
+                return PatientHistoryEntry.objects.none()
             if user.tipo == 'patient' and user.id != patient.user.id:
                 return PatientHistoryEntry.objects.none()
                 
@@ -625,10 +644,33 @@ class PatientMeView(generics.RetrieveAPIView):
 class PatientMeHistoryView(generics.ListAPIView):
     """Vista para que un paciente vea su propio historial médico"""
     serializer_class = PatientHistoryEntrySerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [AllowAny]
     pagination_class = PageNumberPagination
+
+    def _patient_from_token(self):
+        token = self.request.query_params.get("token")
+        if not token:
+            return None
+        try:
+            data = signing.loads(token, salt="patient-history-access", max_age=300)
+        except (BadSignature, SignatureExpired):
+            return None
+        if data.get("action") != "read_history":
+            return None
+        patient_id = data.get("patient_id")
+        if not patient_id:
+            return None
+        try:
+            return Patient.objects.get(id=patient_id)
+        except Patient.DoesNotExist:
+            return None
     
     def get_queryset(self):
+        patient = self._patient_from_token()
+        if patient:
+            return PatientHistoryEntry.objects.filter(patient=patient).order_by('-created_at')
+        if not getattr(self.request.user, "is_authenticated", False):
+            return PatientHistoryEntry.objects.none()
         if self.request.user.tipo != 'patient':
             return PatientHistoryEntry.objects.none()
         
@@ -637,6 +679,24 @@ class PatientMeHistoryView(generics.ListAPIView):
             return PatientHistoryEntry.objects.filter(patient=patient).order_by('-created_at')
         except Patient.DoesNotExist:
             return PatientHistoryEntry.objects.none()
+
+
+class PatientHistoryAccessTokenView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        if request.user.tipo != "patient":
+            return Response({"error": "Solo los pacientes pueden solicitar este token."}, status=status.HTTP_403_FORBIDDEN)
+        try:
+            patient = Patient.objects.get(user=request.user)
+        except Patient.DoesNotExist:
+            return Response({"error": "No tienes un perfil de paciente configurado."}, status=status.HTTP_404_NOT_FOUND)
+
+        token = signing.dumps(
+            {"patient_id": str(patient.id), "action": "read_history"},
+            salt="patient-history-access",
+        )
+        return Response({"token": token, "expires_in": 300}, status=status.HTTP_200_OK)
 class DoctorViewSet(viewsets.ModelViewSet):
     """ViewSet para administrar doctores"""
     queryset = Doctor.objects.all()
@@ -800,6 +860,7 @@ class PasswordResetRequestView(APIView):
     """Vista para solicitar el restablecimiento de contraseña por código de verificación"""
     permission_classes = [AllowAny]
     serializer_class = PasswordResetRequestSerializer
+    throttle_classes = [PasswordResetRateThrottle]
     
     def post(self, request):
         serializer = self.serializer_class(data=request.data)

@@ -525,3 +525,5 @@ pass_app_js.txt
 .venv.flask
 .venv.django
 plan_mejoras_hipo (1).md
+plan_mejoras_hipo_v3.md
+*.ini
