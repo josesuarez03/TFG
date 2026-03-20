@@ -240,6 +240,7 @@ services:
     command: python etl_consumer.py
 
 
+
 volumes:
   postgres_data:
     driver: local
